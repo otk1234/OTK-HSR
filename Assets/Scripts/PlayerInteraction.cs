@@ -3,9 +3,12 @@ using UnityEngine;
 public class PlayerInteraction : MonoBehaviour
 {
     [Header("이 캐릭터는 누구인가?")]
-    public CharacterType myType = CharacterType.Player1; // Inspector에서 설정할 내 신분증
+    public CharacterType myType = CharacterType.Player1;
 
+    
     private InteractableItem nearbyItem = null;
+    private InteractableDoor nearbyDoor = null; 
+
     private Inventory myInventory;
 
     void Start()
@@ -18,18 +21,25 @@ public class PlayerInteraction : MonoBehaviour
         if (FadeManager.instance != null && FadeManager.instance.isFading) return;
         if (CharacterManager.instance.GetActivePlayer() != gameObject) return;
 
-        if (Input.GetKeyDown(KeyCode.E) && nearbyItem != null)
+        if (Input.GetKeyDown(KeyCode.E))
         {
-
-            if (nearbyItem.requiredCharacter == CharacterType.All || nearbyItem.requiredCharacter == myType)
+            // 1순위: 바닥에 떨어진 아이템 줍기
+            if (nearbyItem != null)
             {
-                nearbyItem.PickUp(myInventory);
-                nearbyItem = null;
+                if (nearbyItem.requiredCharacter == CharacterType.All || nearbyItem.requiredCharacter == myType)
+                {
+                    nearbyItem.PickUp(myInventory);
+                    nearbyItem = null;
+                }
+                else
+                {
+                    Debug.Log($"[{gameObject.name}] {nearbyItem.failMessage}");
+                }
             }
-            else
-            {
 
-                Debug.Log($"[{gameObject.name}의 독백] {nearbyItem.failMessage}");
+            else if (nearbyDoor != null)
+            {
+                nearbyDoor.Interact(myInventory);
             }
         }
     }
@@ -41,16 +51,24 @@ public class PlayerInteraction : MonoBehaviour
             nearbyItem = other.GetComponent<InteractableItem>();
             Debug.Log($"[{nearbyItem.itemName}] E키로 획득.");
         }
+
+        else if (other.CompareTag("Door"))
+        {
+            nearbyDoor = other.GetComponent<InteractableDoor>();
+            Debug.Log("E키로 조사.");
+        }
     }
 
     void OnTriggerExit(Collider other)
     {
-        if (other.CompareTag("Item"))
+        if (other.CompareTag("Item") && nearbyItem != null && other.gameObject == nearbyItem.gameObject)
         {
-            if (nearbyItem != null && other.gameObject == nearbyItem.gameObject)
-            {
-                nearbyItem = null;
-            }
+            nearbyItem = null;
+        }
+
+        else if (other.CompareTag("Door") && nearbyDoor != null && other.gameObject == nearbyDoor.gameObject)
+        {
+            nearbyDoor = null;
         }
     }
 }
