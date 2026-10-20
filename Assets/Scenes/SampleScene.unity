@@ -3340,7 +3340,7 @@ MonoBehaviour:
   lockedMessage: "\uC7A0\uACA8 \uC788\uB2E4. \uC5F4\uC1E0\uAC00 \uD544\uC694\uD574."
   openedMessage: "\uBB38\uC774 \uC5F4\uB838\uB2E4."
   closedMessage: "\uBB38\uC744 \uB2EB\uC558\uB2E4."
-  openAngle: 90
+  openAngle: -90
   openSpeed: 2
 --- !u!65 &1867719978
 BoxCollider:
