@@ -1,0 +1,47 @@
+# 프로젝트 개요: 3D 비대칭 협동 추리 스릴러 게임 (프로토타입)
+- **엔진:** Unity 6 (URP 환경)
+- **개발 환경:** 4인 팀 프로젝트 (기획/아트/프로그래밍), GitHub Desktop을 통한 형상 관리(.gitignore Unity 세팅 적용)
+- **핵심 메커니즘:** 2명의 플레이어블 캐릭터를 스위칭하며, 각 캐릭터의 고유 권한(CharacterType)과 인벤토리를 활용해 맵의 기믹(문, 퍼즐 등)을 해제하고 단서를 수집하는 방탈출 형태의 스릴러.
+
+# 1. 현재까지 구현 완료된 핵심 시스템
+
+### A. 카메라 및 캐릭터 제어 (CharacterManager)
+- **시점:** Orthographic 투영을 통한 2D 감성의 탑뷰/아이소메트릭 앵글. Cinemachine 'Cut' 블렌딩으로 시점 전환 최적화.
+- **캐릭터 스위칭:** 비동기 듀얼 캐릭터 매니저(Singleton)를 통해 Tab 키로 두 캐릭터 간 조작 권한(WASD 이동 등) 전환.
+
+### B. 공간 단절 및 화면 연출 (FadeManager)
+- **화면 암전:** 방 이동 및 캐릭터 스위칭 시 UI Canvas와 Coroutine을 활용한 Fade In/Out 적용.
+- **조작 통제:** 암전 중에는 플레이어의 이동 및 상호작용(E키)을 완벽히 차단하는 방어 로직 구현 완료.
+
+### C. 인벤토리 및 비대칭 상호작용 (PlayerInteraction & Item)
+- **모듈화:** 데이터와 행동을 분리. `PlayerInteraction`(센서 및 입력) / `InteractableItem`(아이템 데이터) / `Inventory`(데이터 저장).
+- **비대칭 기믹:** `CharacterType` enum (All, Player1, Player2)을 활용해 특정 캐릭터만 습득 가능한 아이템(예: 무거운 상자는 P2만) 로직 구현.
+
+### D. 조건부 통과 기믹: 회전형 문 (InteractableDoor)
+- **구조:** 빈 오브젝트(`DoorHinge`)를 부모로 삼아 모서리를 회전축(Pivot)으로 설정. 자식으로 문 형태의 큐브 배치.
+- **센서 및 물리:** 부모(Hinge)에 넉넉한 크기의 `BoxCollider (Is Trigger)`를 두어 접근을 감지. 자식(Cube)에 `NavMeshObstacle (Carve)`를 두어 평소엔 길을 막음.
+- **작동 로직:** 
+  1. `InteractableDoor.cs`에서 `requiredItemName` 변수로 필요 아이템(예: GoldKey) 검사 (빈칸일 경우 조건 없이 열림).
+  2. E키 상호작용 시 인벤토리를 대조하여 성공하면 코루틴(Slerp)으로 `openAngle`만큼 부드럽게 회전.
+  3. 열기/닫기(Toggle)가 모두 가능하며, 회전 중(`isMoving`)에는 입력을 무시하는 연타 방지 로직 적용.
+
+### E. 레벨 디자인 (그레이박싱) 통합
+- 팀원이 제작한 맵(Art, Resources, Scenes)을 `Map_Graybox` 폴더로 안전하게 분리 이식.
+- 구버전 Standard 셰이더로 인해 핑크색(Pink of Death)으로 깨지던 머티리얼들을 `Universal Render Pipeline > Lit`으로 변환하여 URP 환경에 맞게 복구 및 프리팹 연동 완료.
+
+# 2. 현재 직면한 다음 개발 목표 (Immediate Next Steps)
+
+지금까지의 상호작용 피드백(아이템 발견, 문 열림/잠김 등)은 모두 콘솔 창(`Debug.Log`)에만 출력되도록 작성되어 있습니다. 다음 순서대로 시스템을 고도화하고자 합니다.
+
+1. **UI 다이얼로그(대화/단서) 시스템 구축 (가장 시급함):**
+   - 콘솔 창의 텍스트를 게임 화면(UI Canvas)의 텍스트 패널로 출력.
+   - 단서 습득 시 타이핑 효과, 캐릭터 독백, 힌트 이미지 출력 등을 관리하는 `DialogueManager` 설계.
+2. **글로벌 상태 보존 매니저 (Save/Load 뼈대):**
+   - 씬(Scene)이 전환되어도 '이미 열어둔 문', '이미 습득한 열쇠'의 상태가 초기화되지 않도록 `DontDestroyOnLoad` 기반의 데이터 관리 싱글톤 설계.
+3. **사운드 및 이펙트 풀링 매니저:**
+   - 발소리, 문 회전음, 획득음 등을 최적화하여 관리하는 Object Pooling 시스템 구축.
+
+# 3. AI 에이전트 행동 지침
+- 코드를 제안할 때는 기존에 작성된 구조(Coroutine 중심의 애니메이션, Singleton 매니저 패턴, Hinge 부모-자식 구조)를 최대한 존중하고 확장하는 방향으로 작성할 것.
+- URP 환경과 NavMesh Agent 기반 이동 시스템과 충돌하지 않는 코드를 작성할 것.
+- 바로 1번 목표인 **'UI 다이얼로그 시스템 구축'**을 위한 구체적인 스크립트 작성과 유니티 에디터(Canvas) 세팅 가이드를 제시해 줄 것.
