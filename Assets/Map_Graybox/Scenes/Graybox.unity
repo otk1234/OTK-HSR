@@ -2456,8 +2456,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::NarrativeGraybox.Interaction.InspectionItem
   Title: "\uD0C1\uC0C1\uC2DC\uACC4"
-  Description: "\uC2DC\uACC4\uB294 9\uC2DC\uB97C \uAC00\uB9AC\uD0A4\uACE0 \uC788\uB2E4.
-    \uCD08\uCE68\uC740 \uC6C0\uC9C1\uC774\uC9C0 \uC54A\uB294\uB2E4."
+  Description: "\uC2DC\uACC4\uB294 9\uC2DC\uB97C \uAC00\uB9AC\uD0A4\uACE0 \uC788\uB2E4. \uCD08\uCE68\uC740 \uC6C0\uC9C1\uC774\uC9C0 \uC54A\uB294\uB2E4."
   Collectible: 0
   outlines:
   - {fileID: 271886590}
@@ -4329,6 +4328,7 @@ GameObject:
   - component: {fileID: 316873894}
   - component: {fileID: 316873893}
   - component: {fileID: 316873892}
+  - component: {fileID: 316873896}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -4434,6 +4434,50 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &316873896
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 316873891}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a79441f348de89743a2939f4d699eac1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Runtime::UnityEngine.Rendering.Universal.UniversalAdditionalCameraData
+  m_RenderShadows: 1
+  m_RequiresDepthTextureOption: 2
+  m_RequiresOpaqueTextureOption: 2
+  m_CameraType: 0
+  m_Cameras: []
+  m_RendererIndex: -1
+  m_VolumeLayerMask:
+    serializedVersion: 2
+    m_Bits: 1
+  m_VolumeTrigger: {fileID: 0}
+  m_VolumeFrameworkUpdateModeOption: 2
+  m_RenderPostProcessing: 0
+  m_Antialiasing: 0
+  m_AntialiasingQuality: 2
+  m_StopNaN: 0
+  m_Dithering: 0
+  m_ClearDepth: 1
+  m_AllowXRRendering: 1
+  m_AllowHDROutput: 1
+  m_UseScreenCoordOverride: 0
+  m_ScreenSizeOverride: {x: 0, y: 0, z: 0, w: 0}
+  m_ScreenCoordScaleBias: {x: 0, y: 0, z: 0, w: 0}
+  m_RequiresDepthTexture: 0
+  m_RequiresColorTexture: 0
+  m_TaaSettings:
+    m_Quality: 3
+    m_FrameInfluence: 0.1
+    m_JitterScale: 1
+    m_MipBias: 0
+    m_VarianceClampScale: 0.9
+    m_ContrastAdaptiveSharpening: 0
+  m_Version: 2
 --- !u!1 &327607948
 GameObject:
   m_ObjectHideFlags: 0
@@ -11265,8 +11309,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::NarrativeGraybox.Interaction.InspectionItem
   Title: "\uC811\uD78C \uBA54\uBAA8"
-  Description: "\uC624\uB298 \uC800\uB141, \uCC3D\uACE0\uC5D0\uC11C \uAE30\uB2E4\uB9B4
-    \uAC83. \uB9C8\uC9C0\uB9C9 \uBB38\uC7A5\uC740 \uC9C0\uC6CC\uC838 \uC788\uB2E4."
+  Description: "\uC624\uB298 \uC800\uB141, \uCC3D\uACE0\uC5D0\uC11C \uAE30\uB2E4\uB9B4 \uAC83. \uB9C8\uC9C0\uB9C9 \uBB38\uC7A5\uC740 \uC9C0\uC6CC\uC838 \uC788\uB2E4."
   Collectible: 1
   outlines:
   - {fileID: 54753489}
@@ -12592,8 +12635,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::NarrativeGraybox.Interaction.InspectionItem
   Title: "\uD669\uB3D9 \uC5F4\uC1E0"
-  Description: "\uC791\uC740 \uD669\uB3D9 \uC5F4\uC1E0. \uC190\uC7A1\uC774\uC5D0
-    \uCC3D\uACE0\uB77C\uB294 \uAE00\uC790\uAC00 \uC0C8\uACA8\uC838 \uC788\uB2E4."
+  Description: "\uC791\uC740 \uD669\uB3D9 \uC5F4\uC1E0. \uC190\uC7A1\uC774\uC5D0 \uCC3D\uACE0\uB77C\uB294 \uAE00\uC790\uAC00 \uC0C8\uACA8\uC838 \uC788\uB2E4."
   Collectible: 1
   outlines:
   - {fileID: 934280336}
@@ -14765,9 +14807,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::NarrativeGraybox.Interaction.InspectionItem
   Title: "\uAC00\uC871\uC0AC\uC9C4"
-  Description: "\uB124 \uC0AC\uB78C\uC774 \uB098\uB780\uD788 \uC11C \uC788\uB294
-    \uAC00\uC871\uC0AC\uC9C4. \uC561\uC790 \uD55C\uCABD\uC5D0 \uC624\uB798\uB41C
-    \uAE01\uD78C \uC790\uAD6D\uC774 \uC788\uB2E4."
+  Description: "\uB124 \uC0AC\uB78C\uC774 \uB098\uB780\uD788 \uC11C \uC788\uB294 \uAC00\uC871\uC0AC\uC9C4. \uC561\uC790 \uD55C\uCABD\uC5D0 \uC624\uB798\uB41C \uAE01\uD78C \uC790\uAD6D\uC774 \uC788\uB2E4."
   Collectible: 0
   outlines:
   - {fileID: 530075384}
@@ -16036,6 +16076,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1574628637}
   - component: {fileID: 1574628636}
+  - component: {fileID: 1574628638}
   m_Layer: 0
   m_Name: Directional Light
   m_TagString: Untagged
@@ -16051,7 +16092,7 @@ Light:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1574628635}
   m_Enabled: 1
-  serializedVersion: 12
+  serializedVersion: 13
   m_Type: 1
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_Intensity: 1.15
@@ -16103,7 +16144,7 @@ Light:
   m_UseBoundingSphereOverride: 0
   m_UseViewFrustumForShadowCasterCull: 1
   m_ForceVisible: 0
-  m_ShadowRadius: 0
+  m_ShapeRadius: 0
   m_ShadowAngle: 0
   m_LightUnit: 1
   m_LuxAtDistance: 1
@@ -16123,6 +16164,35 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1574628638
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1574628635}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 474bcb49853aa07438625e644c072ee6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Runtime::UnityEngine.Rendering.Universal.UniversalAdditionalLightData
+  m_UsePipelineSettings: 1
+  m_AdditionalLightsShadowResolutionTier: 2
+  m_CustomShadowLayers: 0
+  m_LightCookieSize: {x: 1, y: 1}
+  m_LightCookieOffset: {x: 0, y: 0}
+  m_SoftShadowQuality: 0
+  m_RenderingLayersMask:
+    serializedVersion: 0
+    m_Bits: 1
+  m_ShadowRenderingLayersMask:
+    serializedVersion: 0
+    m_Bits: 1
+  m_Version: 4
+  m_LightLayerMask: 1
+  m_ShadowLayerMask: 1
+  m_RenderingLayers: 1
+  m_ShadowRenderingLayers: 1
 --- !u!1 &1593303938
 GameObject:
   m_ObjectHideFlags: 0
@@ -19175,7 +19245,7 @@ MonoBehaviour:
   walkFramesPerSecond: 8
 --- !u!212 &1939515627
 SpriteRenderer:
-  serializedVersion: 2
+  serializedVersion: 3
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -19199,7 +19269,7 @@ SpriteRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 10754, guid: 0000000000000000f000000000000000, type: 0}
+  - {fileID: 2100000, guid: a97c105638bdf8b4a8650670310a4cd3, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -19230,8 +19300,9 @@ SpriteRenderer:
   m_Size: {x: 0.85333335, y: 0.85333335}
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
-  m_WasSpriteAssigned: 1
+  m_WasSpriteAssigned: 0
   m_SpriteSortPoint: 0
+  m_BlendShapeWeights: []
 --- !u!1 &1951199713
 GameObject:
   m_ObjectHideFlags: 0
