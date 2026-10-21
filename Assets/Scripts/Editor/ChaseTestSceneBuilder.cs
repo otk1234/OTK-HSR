@@ -57,7 +57,23 @@ public static class ChaseTestSceneBuilder
         new RoomDef("Storage", "창고", 3.5f, 10f, -8f, -2.5f),
     };
 
-    static Material wallMat, floorMat, timberMat, fabricMat, linenMat, glassMat, ventMat;
+    // 방별 바닥 색 (나무 / 타일 / 돌 / 콘크리트 톤으로 구분)
+    static readonly Dictionary<string, Color> FloorColors = new Dictionary<string, Color>
+    {
+        { "Bedroom",  new Color(0.62f, 0.49f, 0.36f) }, // 따뜻한 나무
+        { "Corridor", new Color(0.60f, 0.55f, 0.47f) }, // 따뜻한 돌
+        { "Study",    new Color(0.34f, 0.42f, 0.37f) }, // 짙은 초록 카펫 (책상과 구분)
+        { "Living",   new Color(0.70f, 0.60f, 0.45f) }, // 밝은 나무
+        { "Hall",     new Color(0.62f, 0.60f, 0.56f) }, // 밝은 돌
+        { "Kitchen",  new Color(0.78f, 0.75f, 0.62f) }, // 노르스름한 타일
+        { "Bath",     new Color(0.58f, 0.67f, 0.71f) }, // 푸른 타일
+        { "Entry",    new Color(0.45f, 0.45f, 0.47f) }, // 어두운 타일
+        { "Storage",  new Color(0.49f, 0.49f, 0.46f) }, // 콘크리트
+    };
+
+    // 이 씬 전용 머티리얼 (팀원 Generated 머티리얼은 모두 흰색이라 구조가 구분되지 않음)
+    static Material groundMat, wallMat, outerWallMat, doorMat, woodMat, hideMat, curtainMat, showerMat,
+        linenMat, sofaMat, tubMat, glassMat, ventMat, markerMat, chaserMat;
 
     [MenuItem("OTK/추격 테스트 씬 다시 만들기")]
     static void BuildFromMenu()
@@ -84,6 +100,38 @@ public static class ChaseTestSceneBuilder
         }
     }
 
+    // 집 전체를 위에서 찍어 PNG로 저장 (확인용). 명령줄: -executeMethod ChaseTestSceneBuilder.CaptureOverview -overviewPath <파일>
+    public static void CaptureOverview()
+    {
+        string[] args = Environment.GetCommandLineArgs();
+        int index = Array.IndexOf(args, "-overviewPath");
+        string path = index >= 0 && index + 1 < args.Length ? args[index + 1] : "ChaseTest_overview.png";
+        EditorSceneManager.OpenScene(TargetScene, OpenSceneMode.Single);
+
+        var go = new GameObject("Overview Camera");
+        var camera = go.AddComponent<Camera>();
+        camera.orthographic = true;
+        camera.orthographicSize = 11f;
+        camera.clearFlags = CameraClearFlags.SolidColor;
+        camera.backgroundColor = new Color(0.08f, 0.09f, 0.11f);
+        go.transform.SetPositionAndRotation(new Vector3(0f, 30f, 0f), Quaternion.Euler(90f, 0f, 0f));
+
+        var target = new RenderTexture(1400, 1100, 24);
+        camera.targetTexture = target;
+        camera.aspect = 1400f / 1100f;
+        ShaderUtil.allowAsyncCompilation = false; // 셰이더를 다 컴파일한 뒤 찍도록
+        camera.Render();
+        camera.Render();
+        RenderTexture.active = target;
+        var image = new Texture2D(target.width, target.height, TextureFormat.RGB24, false);
+        image.ReadPixels(new Rect(0, 0, target.width, target.height), 0, 0);
+        System.IO.File.WriteAllBytes(path, image.EncodeToPNG());
+        RenderTexture.active = null;
+        Object.DestroyImmediate(go);
+        Debug.Log("[OTK] 전체 캡처 저장: " + path);
+        EditorApplication.Exit(0);
+    }
+
     public static void Build()
     {
         if (NavMesh.GetAreaFromName(EntryPoint.DoorArea) < 0 || NavMesh.GetAreaFromName(EntryPoint.WindowArea) < 0 || NavMesh.GetAreaFromName(EntryPoint.VentArea) < 0)
@@ -94,7 +142,7 @@ public static class ChaseTestSceneBuilder
         AssetDatabase.CreateFolder("Assets/Scenes", "ChaseTest");
 
         var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
-        LoadMaterials();
+        CreateMaterials();
 
         // 1) 빛 · 카메라
         var light = new GameObject("Directional Light").AddComponent<Light>();
@@ -115,10 +163,11 @@ public static class ChaseTestSceneBuilder
 
         // 2) 맵 (바닥·벽·가구) → NavMesh 굽기. 문·통로·캐릭터는 굽고 난 뒤에 만듭니다.
         Transform map = new GameObject("Map").transform;
-        Box(map, "Ground", new Vector3(0f, -0.1f, 0f), new Vector3(30f, 0.2f, 26f), floorMat);
+        Box(map, "Ground", new Vector3(0f, -0.1f, 0f), new Vector3(30f, 0.2f, 26f), groundMat);
         BuildWalls(map);
         BuildFurniture(map);
         BakeNavMesh();
+        BuildFloors(map); // 방별 바닥 색 (NavMesh 굽기 뒤에 만들어서 길찾기에 영향 없음)
 
         // 3) 구역 (방별 고정 탑뷰 카메라 + 위치 정보)
         Transform zones = new GameObject("Room Cameras").transform;
@@ -158,8 +207,8 @@ public static class ChaseTestSceneBuilder
         GameObject detective = BuildPlayer("탐정 (Player1)", CharacterType.Player1, new Vector3(-6f, 1f, 1.2f), Color.white);
         GameObject assistant = BuildPlayer("조수 (Player2)", CharacterType.Player2, new Vector3(-5f, 1f, 1.8f), new Color(0.65f, 0.82f, 1f));
 
-        // 7) 시험용 더미 추격자 (홀에서 순찰 시작, 경찰 규칙: 창문·환풍구 못 씀)
-        BuildTestChaser();
+        // 7) 경찰 (홀에서 순찰 시작, 창문·환풍구 못 씀)
+        BuildPolice();
 
         // 8) 시스템
         PrototypeSceneBuilder.BuildFadeCanvas();
@@ -184,38 +233,38 @@ public static class ChaseTestSceneBuilder
         float door = DoorWidth;
 
         // 바깥벽
-        Wall(walls, Axis.AlongX, 8f, -10f, 10f);
-        Wall(walls, Axis.AlongX, -8f, -10f, 10f, (0f, door));
-        Wall(walls, Axis.AlongZ, -10f, -8f, 8f);
-        Wall(walls, Axis.AlongZ, 10f, -8f, 8f);
+        Wall(walls, outerWallMat, Axis.AlongX, 8f, -10f, 10f);
+        Wall(walls, outerWallMat, Axis.AlongX, -8f, -10f, 10f, (0f, door));
+        Wall(walls, outerWallMat, Axis.AlongZ, -10f, -8f, 8f);
+        Wall(walls, outerWallMat, Axis.AlongZ, 10f, -8f, 8f);
 
         // 안쪽 벽 (괄호 = 문/통로 자리: 중심, 폭)
-        Wall(walls, Axis.AlongZ, -3.5f, -8f, 8f, (5.25f, door), (0f, door));
-        Wall(walls, Axis.AlongZ, 3.5f, -8f, 8f, (5.25f, door), (0f, door), (-5.25f, door));
-        Wall(walls, Axis.AlongX, 2.5f, -10f, 10f, (0f, 2f), (6.75f, door));
-        Wall(walls, Axis.AlongX, -2.5f, -10f, 10f, (-6.75f, door), (0f, 2f), (6.75f, door));
+        Wall(walls, wallMat, Axis.AlongZ, -3.5f, -8f, 8f, (5.25f, door), (0f, door));
+        Wall(walls, wallMat, Axis.AlongZ, 3.5f, -8f, 8f, (5.25f, door), (0f, door), (-5.25f, door));
+        Wall(walls, wallMat, Axis.AlongX, 2.5f, -10f, 10f, (0f, 2f), (6.75f, door));
+        Wall(walls, wallMat, Axis.AlongX, -2.5f, -10f, 10f, (-6.75f, door), (0f, 2f), (6.75f, door));
     }
 
-    static void Wall(Transform parent, Axis axis, float fixedCoord, float from, float to, params (float center, float width)[] gaps)
+    static void Wall(Transform parent, Material material, Axis axis, float fixedCoord, float from, float to, params (float center, float width)[] gaps)
     {
         var cuts = gaps.OrderBy(g => g.center).ToList();
         float start = from;
         foreach (var gap in cuts)
         {
-            WallSegment(parent, axis, fixedCoord, start, gap.center - gap.width * 0.5f);
+            WallSegment(parent, material, axis, fixedCoord, start, gap.center - gap.width * 0.5f);
             start = gap.center + gap.width * 0.5f;
         }
-        WallSegment(parent, axis, fixedCoord, start, to);
+        WallSegment(parent, material, axis, fixedCoord, start, to);
     }
 
-    static void WallSegment(Transform parent, Axis axis, float fixedCoord, float a, float b)
+    static void WallSegment(Transform parent, Material material, Axis axis, float fixedCoord, float a, float b)
     {
         float length = b - a;
         if (length <= 0.01f) return;
         float mid = (a + b) * 0.5f;
         Vector3 position = axis == Axis.AlongX ? new Vector3(mid, 0f, fixedCoord) : new Vector3(fixedCoord, 0f, mid);
         Vector3 size = axis == Axis.AlongX ? new Vector3(length + WallThickness, 0f, WallThickness) : new Vector3(WallThickness, 0f, length + WallThickness);
-        TallBox(parent, "Wall", position, size, WallVisualHeight, WallBlockHeight, wallMat);
+        TallBox(parent, "Wall", position, size, WallVisualHeight, WallBlockHeight, material);
     }
 
     static void BuildFurniture(Transform map)
@@ -224,25 +273,25 @@ public static class ChaseTestSceneBuilder
         furniture.SetParent(map);
         // 침실
         Box(furniture, "침대", new Vector3(-8.2f, 0.25f, 6.6f), new Vector3(1.8f, 0.5f, 2.2f), linenMat);
-        TallBox(furniture, "옷장", new Vector3(-5f, 0f, 7.6f), new Vector3(1.6f, 0f, 0.6f), 1.4f, 2.2f, timberMat);
+        TallBox(furniture, "옷장", new Vector3(-5f, 0f, 7.6f), new Vector3(1.6f, 0f, 0.6f), 1.4f, 2.2f, hideMat);
         // 거실
-        Box(furniture, "소파", new Vector3(-7f, 0.4f, -0.5f), new Vector3(2.4f, 0.8f, 0.9f), fabricMat);
-        TallBox(furniture, "커튼", new Vector3(-9.8f, 0f, -1.6f), new Vector3(0.1f, 0f, 1.0f), 1.6f, 2.4f, fabricMat);
+        Box(furniture, "소파", new Vector3(-7f, 0.4f, -0.5f), new Vector3(2.4f, 0.8f, 0.9f), sofaMat);
+        TallBox(furniture, "커튼", new Vector3(-9.8f, 0f, -1.6f), new Vector3(0.1f, 0f, 1.0f), 1.6f, 2.4f, curtainMat);
         // 서재
-        Box(furniture, "책상", new Vector3(7f, 0.4f, 6.5f), new Vector3(2f, 0.8f, 1f), timberMat);
-        TallBox(furniture, "수납장", new Vector3(9.4f, 0f, 4f), new Vector3(0.6f, 0f, 1.4f), 1.4f, 2.2f, timberMat);
+        Box(furniture, "책상", new Vector3(7f, 0.4f, 6.5f), new Vector3(2f, 0.8f, 1f), woodMat);
+        TallBox(furniture, "수납장", new Vector3(9.4f, 0f, 4f), new Vector3(0.6f, 0f, 1.4f), 1.4f, 2.2f, hideMat);
         // 주방
-        Box(furniture, "조리대", new Vector3(9.3f, 0.45f, 1.25f), new Vector3(1f, 0.9f, 1.5f), timberMat);
+        Box(furniture, "조리대", new Vector3(9.3f, 0.45f, 1.25f), new Vector3(1f, 0.9f, 1.5f), woodMat);
         // 홀 (둘레를 돌 수 있는 탁자)
-        Box(furniture, "탁자", new Vector3(0f, 0.4f, 0f), new Vector3(1.2f, 0.8f, 1.2f), timberMat);
+        Box(furniture, "탁자", new Vector3(0f, 0.4f, 0f), new Vector3(1.2f, 0.8f, 1.2f), woodMat);
         // 창고
-        TallBox(furniture, "선반", new Vector3(8.5f, 0f, -7.4f), new Vector3(2.6f, 0f, 0.6f), 1.6f, 2.2f, timberMat);
-        TallBox(furniture, "창고 수납장", new Vector3(5f, 0f, -7.4f), new Vector3(1.4f, 0f, 0.6f), 1.6f, 2.2f, timberMat);
+        TallBox(furniture, "선반", new Vector3(8.5f, 0f, -7.4f), new Vector3(2.6f, 0f, 0.6f), 1.6f, 2.2f, woodMat);
+        TallBox(furniture, "창고 수납장", new Vector3(5f, 0f, -7.4f), new Vector3(1.4f, 0f, 0.6f), 1.6f, 2.2f, hideMat);
         // 욕실
-        Box(furniture, "욕조", new Vector3(-8.5f, 0.3f, -7f), new Vector3(2f, 0.6f, 1.2f), linenMat);
-        TallBox(furniture, "샤워 커튼", new Vector3(-8.5f, 0f, -6.3f), new Vector3(2f, 0f, 0.06f), 1.6f, 2.4f, fabricMat);
+        Box(furniture, "욕조", new Vector3(-8.5f, 0.3f, -7f), new Vector3(2f, 0.6f, 1.2f), tubMat);
+        TallBox(furniture, "샤워 커튼", new Vector3(-8.5f, 0f, -6.3f), new Vector3(2f, 0f, 0.06f), 1.6f, 2.4f, showerMat);
         // 현관
-        Box(furniture, "신발장", new Vector3(-2.5f, 0.5f, -7.6f), new Vector3(1.4f, 1f, 0.5f), timberMat);
+        Box(furniture, "신발장", new Vector3(-2.5f, 0.5f, -7.6f), new Vector3(1.4f, 1f, 0.5f), woodMat);
     }
 
     static GameObject Box(Transform parent, string name, Vector3 center, Vector3 size, Material material)
@@ -330,7 +379,7 @@ public static class ChaseTestSceneBuilder
         panel.transform.SetParent(pivot.transform, false);
         panel.transform.localPosition = new Vector3(0f, visualHeight * 0.5f, DoorWidth * 0.5f);
         panel.transform.localScale = new Vector3(0.12f, visualHeight, DoorWidth - 0.05f);
-        panel.GetComponent<Renderer>().sharedMaterial = timberMat;
+        panel.GetComponent<Renderer>().sharedMaterial = doorMat;
         var block = panel.GetComponent<BoxCollider>();
         block.size = new Vector3(1f, blockHeight / visualHeight, 1f);
         block.center = new Vector3(0f, (blockHeight / visualHeight - 1f) * 0.5f, 0f);
@@ -413,6 +462,9 @@ public static class ChaseTestSceneBuilder
         reach.radius = 0.9f;
         reach.center = Vector3.up;
 
+        // 숨을 수 있는 곳 바닥 표시 (테스트용)
+        Visual(go.transform, "Marker", new Vector3(0f, 0.012f, 0f), new Vector3(0.55f, 0.01f, 0.55f), markerMat);
+
         var spot = go.AddComponent<HidingSpot>();
         spot.kind = kind;
         spot.displayName = name;
@@ -466,12 +518,13 @@ public static class ChaseTestSceneBuilder
         return player;
     }
 
-    static void BuildTestChaser()
+    static void BuildPolice()
     {
         var points = new GameObject("Patrol Points").transform;
         Vector3[] route =
         {
-            new Vector3(-1.8f, 0f, -1.5f), new Vector3(6.5f, 0f, -1f), new Vector3(7f, 0f, -4.8f), new Vector3(0f, 0f, -5.2f),
+            // 홀 지점은 거실 문(x=-3.5)에서 5m 이상 떨어뜨려, 문을 열고 들켜도 닫고 잠글 시간이 있도록
+            new Vector3(2.0f, 0f, -1.8f), new Vector3(6.5f, 0f, -1f), new Vector3(7f, 0f, -4.8f), new Vector3(0f, 0f, -5.2f),
             new Vector3(1.8f, 0f, 1.5f), new Vector3(0f, 0f, 5.2f), new Vector3(6f, 0f, 4.8f), new Vector3(6.5f, 0f, -1f),
         };
         var transforms = new List<Transform>();
@@ -484,11 +537,10 @@ public static class ChaseTestSceneBuilder
         }
 
         var chaser = GameObject.CreatePrimitive(PrimitiveType.Capsule);
-        chaser.name = "시험용 추격자 (경찰 규칙)";
+        chaser.name = "경찰";
         chaser.transform.position = new Vector3(1.8f, 1f, -1.5f);
         var renderer = chaser.GetComponent<Renderer>();
-        renderer.sharedMaterial = new Material(timberMat) { name = "ChaserRed", color = new Color(0.85f, 0.15f, 0.15f) };
-        AssetDatabase.CreateAsset(renderer.sharedMaterial, TargetFolder + "/ChaserRed.mat");
+        renderer.sharedMaterial = chaserMat;
 
         // 바라보는 방향 표시
         Visual(chaser.transform, "Facing", new Vector3(0f, 0.5f, 0.45f), new Vector3(0.25f, 0.12f, 0.3f), glassMat);
@@ -504,20 +556,54 @@ public static class ChaseTestSceneBuilder
         var motor = chaser.AddComponent<ChaserMotor>();
         motor.chaserType = ChaserType.Police;
         chaser.AddComponent<ChaserSenses>();
-        chaser.AddComponent<TestChaser>().patrolPoints = transforms.ToArray();
+        chaser.AddComponent<PoliceAI>().patrolPoints = transforms.ToArray();
     }
 
     // ---------------- 기타 ----------------
 
-    static void LoadMaterials()
+    // 차분한 단색 머티리얼. 구조(바닥 < 벽 < 가구)가 명도 차이로 구분되도록 맞췄습니다.
+    static void CreateMaterials()
     {
-        wallMat = PrototypeSceneBuilder.LoadMaterial("Wall");
-        floorMat = PrototypeSceneBuilder.LoadMaterial("Floor");
-        timberMat = PrototypeSceneBuilder.LoadMaterial("DemoTimber");
-        fabricMat = PrototypeSceneBuilder.LoadMaterial("DemoFabric");
-        linenMat = PrototypeSceneBuilder.LoadMaterial("DemoLinen");
-        glassMat = PrototypeSceneBuilder.LoadMaterial("TerminalScreen");
-        ventMat = PrototypeSceneBuilder.LoadMaterial("Terminal");
+        AssetDatabase.CreateFolder(TargetFolder, "Materials");
+        groundMat    = CreateMaterial("Ground_Grass", new Color(0.33f, 0.42f, 0.30f));
+        wallMat      = CreateMaterial("Wall_Inner",   new Color(0.36f, 0.34f, 0.33f));
+        outerWallMat = CreateMaterial("Wall_Outer",   new Color(0.24f, 0.23f, 0.24f));
+        doorMat      = CreateMaterial("Door",         new Color(0.55f, 0.32f, 0.16f));
+        woodMat      = CreateMaterial("Furniture",    new Color(0.48f, 0.37f, 0.27f));
+        hideMat      = CreateMaterial("Hide_Closet",  new Color(0.30f, 0.20f, 0.13f));
+        curtainMat   = CreateMaterial("Hide_Curtain", new Color(0.52f, 0.18f, 0.20f));
+        showerMat    = CreateMaterial("Hide_Shower",  new Color(0.36f, 0.58f, 0.60f));
+        linenMat     = CreateMaterial("Bed",          new Color(0.80f, 0.82f, 0.88f));
+        sofaMat      = CreateMaterial("Sofa",         new Color(0.30f, 0.44f, 0.50f));
+        tubMat       = CreateMaterial("Tub",          new Color(0.90f, 0.92f, 0.95f));
+        glassMat     = CreateMaterial("Window",       new Color(0.55f, 0.78f, 0.95f));
+        ventMat      = CreateMaterial("Vent",         new Color(0.15f, 0.15f, 0.17f));
+        markerMat    = CreateMaterial("Hide_Marker",  new Color(0.35f, 0.62f, 0.40f));
+        chaserMat    = CreateMaterial("Chaser",       new Color(0.85f, 0.15f, 0.15f));
+    }
+
+    static Material CreateMaterial(string name, Color color)
+    {
+        Shader shader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+        var material = new Material(shader) { name = name };
+        material.SetColor("_BaseColor", color);
+        material.color = color;
+        if (material.HasProperty("_Smoothness")) material.SetFloat("_Smoothness", 0.15f);
+        AssetDatabase.CreateAsset(material, $"{TargetFolder}/Materials/{name}.mat");
+        return material;
+    }
+
+    // 방별 바닥 (얇은 판, 충돌체 없음)
+    static void BuildFloors(Transform map)
+    {
+        Transform floors = new GameObject("Floors").transform;
+        floors.SetParent(map);
+        foreach (RoomDef room in Rooms)
+        {
+            Material material = CreateMaterial("Floor_" + room.id, FloorColors[room.id]);
+            var center = new Vector3((room.minX + room.maxX) * 0.5f, 0.005f, (room.minZ + room.maxZ) * 0.5f);
+            Visual(floors, "Floor_" + room.name, center, new Vector3(room.maxX - room.minX, 0.01f, room.maxZ - room.minZ), material);
+        }
     }
 
     static void AddToBuildSettings()

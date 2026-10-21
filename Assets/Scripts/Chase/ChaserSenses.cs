@@ -133,9 +133,11 @@ public class ChaserSenses : MonoBehaviour
         // 플레이어 캐릭터가 낸 소리만 듣습니다 (자기·다른 추격자 소리는 무시)
         if (noise.source == null || noise.source.GetComponent<CharacterStatus>() == null) return;
 
+        // 벽·문·큰 가구만 소리를 막도록 눈높이에서 수평으로 검사 (탁자 같은 낮은 가구는 무시)
         float radius = noise.radius * hearingMultiplier;
-        if (Physics.Linecast(Eye, noise.position + Vector3.up * 0.3f, out RaycastHit hit, obstacleMask, QueryTriggerInteraction.Ignore)
-            && !hit.collider.transform.IsChildOf(noise.source.transform))
+        Vector3 ear = Eye, source = new Vector3(noise.position.x, ear.y, noise.position.z);
+        if (Physics.Linecast(ear, source, out RaycastHit hit, obstacleMask, QueryTriggerInteraction.Ignore)
+            && !hit.collider.transform.IsChildOf(noise.source.transform) && !hit.collider.transform.IsChildOf(transform))
             radius *= wallMuffle;
 
         if (Vector3.Distance(transform.position, noise.position) > radius) return;

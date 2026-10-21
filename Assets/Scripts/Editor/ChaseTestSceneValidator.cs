@@ -34,7 +34,7 @@ public static class ChaseTestSceneValidator
         if (manager == null || manager.players == null || manager.players.Length != 2) problems.Add("CharacterManager 캐릭터 2명 설정 안 됨");
         if (Object.FindAnyObjectByType<GameStateManager>() == null) problems.Add("GameStateManager 없음");
         if (Object.FindAnyObjectByType<FadeManager>() == null) problems.Add("FadeManager 없음");
-        if (Object.FindAnyObjectByType<TestChaser>() == null) problems.Add("시험용 추격자 없음");
+        if (Object.FindAnyObjectByType<PoliceAI>() == null) problems.Add("경찰 AI 없음");
 
         var entries = Object.FindObjectsByType<EntryPoint>();
         if (entries.Count(e => e.kind == EntryKind.Door) != 9) problems.Add("문 9개가 아님");
@@ -142,7 +142,7 @@ public static class ChaseTestSceneValidator
         CharacterStatus p2 = manager.players[1].GetComponent<CharacterStatus>();
         var move1 = p1.GetComponent<PlayerMovement>();
         var stamina1 = p1.GetComponent<PlayerStamina>();
-        var chaser = Object.FindAnyObjectByType<TestChaser>();
+        var chaser = Object.FindAnyObjectByType<PoliceAI>();
         var motor = chaser.GetComponent<ChaserMotor>();
         var senses = chaser.GetComponent<ChaserSenses>();
         EntryPoint Entry(string name) => EntryPoint.All.First(e => e.displayName == name);
@@ -318,6 +318,18 @@ public static class ChaseTestSceneValidator
         yield return game.chaseEndDelay + 0.3f;
         Check(GameStateManager.State == GameState.Investigation, "추격이 끝나면 잠시 뒤 추리 상태로");
 
+        // 방을 넘는 페이드 도중에 추격이 시작되면 페이드를 바로 끊음
+        Place(p1, new Vector3(1.5f, 0f, 1.5f));            // 주방 → 홀 (추리 상태라 페이드 시작)
+        yield return 0.15f;
+        bool wasFading = FadeManager.instance.isFading;
+        game.ForceChase(true);
+        yield return 0.05f;
+        Check(wasFading && !FadeManager.instance.isFading && FadeManager.instance.fadePanel.alpha < 0.01f &&
+              CameraTrigger.All.First(r => r.roomName == "홀").virtualCamera.activeSelf,
+            $"페이드 도중 추격 시작 → 페이드 즉시 중단 + 새 방 카메라 (페이드 중이었음: {wasFading})");
+        game.ForceChase(false);
+        yield return game.chaseEndDelay + 0.3f;
+
         // ---- 숨기 ----
         HidingSpot closet = Spot("옷장"), underBed = Spot("침대 밑"), curtain = Spot("커튼");
         Place(chaser, new Vector3(8f, 0f, -6f), 0f);       // 멀리 (창고)
@@ -360,11 +372,125 @@ public static class ChaseTestSceneValidator
         curtain.Exit(p1);
         yield return curtain.exitTime + 0.2f;
 
-        // ---- 더미 추격자 AI: 보는 앞에서 숨으면 발견 → 추격 → 숨는 곳을 뒤져 잡음 ----
+        // ---- 경찰 AI ----
+        PoliceAI policeAI = chaser;
+        policeAI.searchTime = 3f;  // 점검 시간 단축
+        policeAI.giveUpTime = 4f;
+        float waitedFor;
+        void ForgetAll() { senses.Forget(p1); senses.Forget(p2); }
+        float Flat(Vector3 a, Vector3 b) => new Vector2(a.x - b.x, a.z - b.z).magnitude;
+
+        // 순찰
+        Place(p1, new Vector3(-8f, 0f, 4f));               // 침실 (닫힌 문 뒤)
+        Place(chaser, new Vector3(1.5f, 0f, -1.5f), 0f);
+        yield return 0.2f;
+        ForgetAll();
+        policeAI.enabled = true;
+        policeAI.ResetToPatrol();
+        Vector3 patrolStart = chaser.transform.position;
+        yield return 3f;
+        Check(policeAI.Current == PoliceAI.Mode.Patrol && Flat(chaser.transform.position, patrolStart) > 1f, "경찰 순찰: 순찰 지점을 따라 걸음");
+
+        // 소리 → 의심 → 확인 → 순찰 복귀
+        Place(chaser, new Vector3(1.5f, 0f, -1.5f), 180f);
+        policeAI.ResetToPatrol();
+        yield return 0.1f;
+        Vector3 noisePos = new Vector3(-1.5f, 0f, 1.5f);
+        NoiseSystem.Emit(noisePos, 8f, NoiseKind.Run, p2.gameObject);
+        yield return 0.1f;
+        Check(policeAI.Current == PoliceAI.Mode.Suspicious, "소리를 들으면 의심 상태 → 확인하러 감");
+        for (waitedFor = 0f; waitedFor < 5f && Flat(chaser.transform.position, noisePos) > 1.2f; waitedFor += 0.2f) yield return 0.2f;
+        Check(Flat(chaser.transform.position, noisePos) <= 1.2f, "소리 난 곳에 도착");
+        yield return policeAI.lookAroundTime + 1.5f;
+        Check(policeAI.Current == PoliceAI.Mode.Patrol && !GameStateManager.IsChase, "둘러본 뒤 순찰로 돌아감 (추격 상태 아님)");
+
+        // 발견 → 추격 → 놓침(몰래 숨음) → 수색 → 포기 → 복귀
+        Place(chaser, new Vector3(1.5f, 0f, -2.2f), 0f);
+        policeAI.ResetToPatrol();
+        ForgetAll();
+        Place(p1, new Vector3(1.5f, 0f, 2f));
+        for (waitedFor = 0f; waitedFor < 2f && policeAI.Current != PoliceAI.Mode.Chase; waitedFor += 0.1f) yield return 0.1f;
+        Check(policeAI.Current == PoliceAI.Mode.Chase && GameStateManager.IsChase && game.IsTargeted(p1), "발견 → 추격 + 게임 추격 상태");
+        Place(p1, underBed.transform.position);            // 시야 밖으로 사라져서 몰래 숨음
+        underBed.TryEnter(p1);
+        for (waitedFor = 0f; waitedFor < 5f && policeAI.Current != PoliceAI.Mode.Search; waitedFor += 0.2f) yield return 0.2f;
+        Check(policeAI.Current == PoliceAI.Mode.Search && GameStateManager.IsChase, "놓치면 마지막으로 본 곳 주변 수색 (추격 상태 유지)");
+        for (waitedFor = 0f; waitedFor < policeAI.searchTime + 3f && policeAI.Current == PoliceAI.Mode.Search; waitedFor += 0.2f) yield return 0.2f;
+        Check(policeAI.Current == PoliceAI.Mode.Return || policeAI.Current == PoliceAI.Mode.Patrol, "수색 시간이 지나면 포기하고 복귀");
+        yield return game.chaseEndDelay + 0.3f;
+        Check(!GameStateManager.IsChase && p1.IsHidden && !p1.IsCaught, "숨는 장면을 못 봤으면 찾지 못함 → 추리 상태로");
+        underBed.Exit(p1);
+        yield return underBed.exitTime + 0.2f;
+
+        // 잠긴 문: 노크·경고 → 부수기 → 포기 → 의심 지점 기억
+        Inventory inventory1 = p1.GetComponent<Inventory>();
+        if (livingDoor.door.IsOpen) { livingDoor.door.Interact(inventory1); yield return 1f; }
+        if (!livingDoor.door.IsLocked) livingDoor.door.ToggleLock(inventory1);
+        float durabilityBefore = livingDoor.door.Durability;
+        Place(p1, new Vector3(-5f, 0f, 1f));                // 잠긴 거실 안
+        Place(chaser, new Vector3(-1.5f, 0f, 1.5f), 270f);
+        policeAI.ResetToPatrol();
+        ForgetAll();
+        yield return 0.1f;
+        noises.Clear();
+        NoiseSystem.Emit(p1.transform.position, 10f, NoiseKind.Run, p1.gameObject);
+        for (waitedFor = 0f; waitedFor < 6f && policeAI.Current != PoliceAI.Mode.DoorKnock; waitedFor += 0.1f) yield return 0.1f;
+        Check(policeAI.Current == PoliceAI.Mode.DoorKnock && policeAI.DoorTarget == livingDoor, "안에서 소리 → 길이 막힘 → 잠긴 거실 문 앞에서 노크");
+        Check(noises.Any(n => n.source == chaser.gameObject && n.kind == NoiseKind.Other), "노크 소리 발생");
+        for (waitedFor = 0f; waitedFor < 4f && policeAI.Current != PoliceAI.Mode.DoorBash; waitedFor += 0.1f) yield return 0.1f;
+        Check(policeAI.Current == PoliceAI.Mode.DoorBash, "경고 뒤 부수기 시작");
+        for (waitedFor = 0f; waitedFor < policeAI.giveUpTime + 3f && policeAI.Current == PoliceAI.Mode.DoorBash; waitedFor += 0.2f) yield return 0.2f;
+        Check(policeAI.Current == PoliceAI.Mode.Return || policeAI.Current == PoliceAI.Mode.Patrol, "시간이 지나면 부수기를 포기하고 복귀");
+        Check(livingDoor.door.Durability < durabilityBefore && !livingDoor.door.IsBroken, $"부수다 만 문은 피해가 남음 (내구도 {livingDoor.door.Durability:0})");
+        Check(policeAI.SuspiciousPoints.Count == 1 && policeAI.SuspiciousPoints[0].door == livingDoor && policeAI.SuspiciousPoints[0].room.roomName == "거실",
+            "포기한 방(거실)을 의심 지점으로 기억");
+
+        // 의심 지점 재방문: 잠금이 풀려 있으면 방 안까지 확인
+        Place(p1, new Vector3(-8f, 0f, 4f));                // 들키지 않게 침실로
+        senses.hearingMultiplier = 0f;                       // 잠금 푸는 소리로 확인하러 가지 않도록 (재방문 자체를 점검)
+        livingDoor.door.ToggleLock(inventory1);
+        yield return 0.1f;
+        senses.hearingMultiplier = 1f;
+        policeAI.revisitInterval = 0f;
+        for (waitedFor = 0f; waitedFor < 30f && !(policeAI.Current == PoliceAI.Mode.CheckSuspicious && RoomOf(chaser) == "거실"); waitedFor += 0.25f) yield return 0.25f;
+        Check(policeAI.Current == PoliceAI.Mode.CheckSuspicious && RoomOf(chaser) == "거실",
+            $"순찰 중 의심 지점을 다시 들러, 잠금이 풀려 있으니 방 안까지 확인 ({waitedFor:0.0}초)");
+        for (waitedFor = 0f; waitedFor < 10f && policeAI.SuspiciousPoints.Count > 0; waitedFor += 0.25f) yield return 0.25f;
+        Check(policeAI.SuspiciousPoints.Count == 0, $"확인이 끝나면 의심 지점 삭제 (상태: {policeAI.StateLabel}, 위치 {RoomOf(chaser)} {chaser.transform.position})");
+
+        // 잠긴 문 바로 앞에 서 있을 때 너머에서 소리 (시연에서 찾은 경우: 끊긴 길의 끝에 이미 서 있음)
+        policeAI.enabled = false;                            // 준비하는 동안 경찰이 문을 다시 열지 않도록
+        Place(chaser, new Vector3(-2.5f, 0f, -0.2f), 270f);  // 거실 문 홀 쪽 바로 앞
+        senses.hearingMultiplier = 0f;
+        if (livingDoor.door.IsOpen) { livingDoor.door.Interact(inventory1); yield return 1f; }
+        livingDoor.door.ToggleLock(inventory1);
+        Place(p1, new Vector3(-5f, 0f, 1f));
+        yield return 0.1f;
+        senses.hearingMultiplier = 1f;
+        Check(livingDoor.door.IsLocked, "준비: 거실 문 잠김");
+        policeAI.enabled = true;
+        policeAI.ResetToPatrol();
+        motor.Stop();
+        ForgetAll();
+        yield return 0.1f;
+        NoiseSystem.Emit(p1.transform.position, 10f, NoiseKind.Run, p1.gameObject);
+        for (waitedFor = 0f; waitedFor < 4f && policeAI.Current != PoliceAI.Mode.DoorKnock; waitedFor += 0.1f) yield return 0.1f;
+        Check(policeAI.Current == PoliceAI.Mode.DoorKnock, $"잠긴 문 바로 앞에 서 있어도 막힌 걸 알아채고 노크 (상태: {policeAI.StateLabel})");
+        policeAI.enabled = false;
+        motor.Stop();
+        senses.hearingMultiplier = 0f;
+        livingDoor.door.ToggleLock(inventory1);
+        yield return 0.1f;
+        senses.hearingMultiplier = 1f;
+
+        // ---- 경찰 AI: 보는 앞에서 숨으면 발견 → 추격 → 숨는 곳을 뒤져 잡음 (씬 재시작이 걸리므로 마지막) ----
         closet.Exit(p2);
         yield return closet.exitTime + 0.2f;
         Check(!closet.IsOccupied && !closet.WasSeenEnteringBy(chaser.gameObject), "모두 나오면 목격 기록 초기화");
+        Place(p1, new Vector3(6f, 0f, 5f));                 // 탐정은 멀리 (서재)
         Place(chaser, closet.transform.position + new Vector3(0f, 0f, -3f), 0f);
+        policeAI.ResetToPatrol();
+        motor.Stop(); // 옷장 쪽을 보고 서 있도록
         senses.Forget(p1);
         senses.Forget(p2);
         chaser.enabled = true;

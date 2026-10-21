@@ -8,6 +8,13 @@ public class ChaseDebugOverlay : MonoBehaviour
     private string message = "";
     private float messageTime;
     private GUIStyle style;
+    private GUIStyle captionStyle;
+
+    // 시연 자막 (에디터 시연 스크립트가 씀). 씬이 다시 시작돼도 남아 있도록 static.
+    public static string Caption = "";
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    static void ResetStatics() => Caption = "";
 
     void OnEnable()
     {
@@ -50,12 +57,12 @@ public class ChaseDebugOverlay : MonoBehaviour
             text.AppendLine($"{active}{character.name}: {character.State}{staminaText}  @ {where}{targeted}");
         }
 
-        foreach (TestChaser chaser in FindObjectsByType<TestChaser>())
+        foreach (ChaserSenses senses in ChaserSenses.All)
         {
-            var senses = chaser.GetComponent<ChaserSenses>();
+            var brain = senses.GetComponent<IChaserBrain>();
             float awareness = 0f;
             foreach (CharacterStatus character in CharacterStatus.All) awareness = Mathf.Max(awareness, senses.Awareness(character));
-            text.AppendLine($"   {chaser.name}: {chaser.Current}  인지도 {awareness:P0}");
+            text.AppendLine($"   {senses.name}: {(brain != null ? brain.StateLabel : "-")}  인지도 {awareness:P0}");
         }
 
         text.AppendLine();
@@ -67,5 +74,19 @@ public class ChaseDebugOverlay : MonoBehaviour
         GUI.DrawTexture(new Rect(8, 8, 620, 190), Texture2D.whiteTexture);
         GUI.color = Color.white;
         GUI.Label(new Rect(16, 12, 610, 186), text.ToString(), style);
+
+        if (!string.IsNullOrEmpty(Caption))
+        {
+            if (captionStyle == null)
+            {
+                captionStyle = new GUIStyle(GUI.skin.label) { fontSize = 20, wordWrap = true, richText = true, alignment = TextAnchor.MiddleCenter };
+                captionStyle.normal.textColor = Color.white;
+            }
+            var box = new Rect(Screen.width * 0.5f - 420, Screen.height - 130, 840, 110);
+            GUI.color = new Color(0f, 0f, 0f, 0.8f);
+            GUI.DrawTexture(box, Texture2D.whiteTexture);
+            GUI.color = Color.white;
+            GUI.Label(new Rect(box.x + 12, box.y + 6, box.width - 24, box.height - 12), Caption, captionStyle);
+        }
     }
 }
