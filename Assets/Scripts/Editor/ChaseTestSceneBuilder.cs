@@ -27,15 +27,17 @@ public static class ChaseTestSceneBuilder
 {
     public const string TargetScene = "Assets/Scenes/ChaseTest.unity";
     const string TargetFolder = "Assets/Scenes/ChaseTest";
+    // 머티리얼·NavMesh를 저장할 폴더 (아버지 테스트 씬 생성기도 같은 도우미를 씀)
+    internal static string assetFolder = TargetFolder;
     const string SpriteSheetGuid = "8997f85750edfef479bf5a1765a6ed3f"; // 팀원 TestCharacter4Directions.png
 
     const float WallThickness = 0.2f;
     const float WallVisualHeight = 1.0f; // 탑뷰에서 방 안이 보이도록 낮게 보이지만
     const float WallBlockHeight = 2.6f;  // 시야를 가리는 충돌체는 사람 키보다 높게
-    const float DoorWidth = 1.2f;
+    internal const float DoorWidth = 1.2f;
     const float LinkReach = 0.9f;        // 벽 중심에서 링크 양 끝까지
 
-    enum Axis { AlongX, AlongZ } // 벽이 뻗는 방향
+    internal enum Axis { AlongX, AlongZ } // 벽이 뻗는 방향
 
     struct RoomDef
     {
@@ -72,7 +74,7 @@ public static class ChaseTestSceneBuilder
     };
 
     // 이 씬 전용 머티리얼 (팀원 Generated 머티리얼은 모두 흰색이라 구조가 구분되지 않음)
-    static Material groundMat, wallMat, outerWallMat, doorMat, woodMat, hideMat, curtainMat, showerMat,
+    internal static Material groundMat, wallMat, outerWallMat, doorMat, woodMat, hideMat, curtainMat, showerMat,
         linenMat, sofaMat, tubMat, glassMat, ventMat, markerMat, chaserMat;
 
     [MenuItem("OTK/추격 테스트 씬 다시 만들기")]
@@ -101,17 +103,19 @@ public static class ChaseTestSceneBuilder
     }
 
     // 집 전체를 위에서 찍어 PNG로 저장 (확인용). 명령줄: -executeMethod ChaseTestSceneBuilder.CaptureOverview -overviewPath <파일>
-    public static void CaptureOverview()
+    public static void CaptureOverview() => CaptureScene(TargetScene, "ChaseTest_overview.png", 11f);
+
+    internal static void CaptureScene(string scenePath, string defaultFile, float orthographicSize)
     {
         string[] args = Environment.GetCommandLineArgs();
         int index = Array.IndexOf(args, "-overviewPath");
-        string path = index >= 0 && index + 1 < args.Length ? args[index + 1] : "ChaseTest_overview.png";
-        EditorSceneManager.OpenScene(TargetScene, OpenSceneMode.Single);
+        string path = index >= 0 && index + 1 < args.Length ? args[index + 1] : defaultFile;
+        EditorSceneManager.OpenScene(scenePath, OpenSceneMode.Single);
 
         var go = new GameObject("Overview Camera");
         var camera = go.AddComponent<Camera>();
         camera.orthographic = true;
-        camera.orthographicSize = 11f;
+        camera.orthographicSize = orthographicSize;
         camera.clearFlags = CameraClearFlags.SolidColor;
         camera.backgroundColor = new Color(0.08f, 0.09f, 0.11f);
         go.transform.SetPositionAndRotation(new Vector3(0f, 30f, 0f), Quaternion.Euler(90f, 0f, 0f));
@@ -142,6 +146,7 @@ public static class ChaseTestSceneBuilder
         AssetDatabase.CreateFolder("Assets/Scenes", "ChaseTest");
 
         var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+        assetFolder = TargetFolder;
         CreateMaterials();
 
         // 1) 빛 · 카메라
@@ -245,7 +250,7 @@ public static class ChaseTestSceneBuilder
         Wall(walls, wallMat, Axis.AlongX, -2.5f, -10f, 10f, (-6.75f, door), (0f, 2f), (6.75f, door));
     }
 
-    static void Wall(Transform parent, Material material, Axis axis, float fixedCoord, float from, float to, params (float center, float width)[] gaps)
+    internal static void Wall(Transform parent, Material material, Axis axis, float fixedCoord, float from, float to, params (float center, float width)[] gaps)
     {
         var cuts = gaps.OrderBy(g => g.center).ToList();
         float start = from;
@@ -294,7 +299,7 @@ public static class ChaseTestSceneBuilder
         Box(furniture, "신발장", new Vector3(-2.5f, 0.5f, -7.6f), new Vector3(1.4f, 1f, 0.5f), woodMat);
     }
 
-    static GameObject Box(Transform parent, string name, Vector3 center, Vector3 size, Material material)
+    internal static GameObject Box(Transform parent, string name, Vector3 center, Vector3 size, Material material)
     {
         var box = GameObject.CreatePrimitive(PrimitiveType.Cube);
         box.name = name;
@@ -306,7 +311,7 @@ public static class ChaseTestSceneBuilder
     }
 
     // 충돌체 없는 표시용 큐브 (로컬 좌표)
-    static void Visual(Transform parent, string name, Vector3 localPosition, Vector3 localScale, Material material)
+    internal static void Visual(Transform parent, string name, Vector3 localPosition, Vector3 localScale, Material material)
     {
         var cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
         cube.name = name;
@@ -318,7 +323,7 @@ public static class ChaseTestSceneBuilder
     }
 
     // 보이는 높이는 낮게(탑뷰에서 방 안이 보이도록), 충돌체(시야 가림)는 높게. size.y는 무시.
-    static GameObject TallBox(Transform parent, string name, Vector3 floorPosition, Vector3 size, float visualHeight, float blockHeight, Material material)
+    internal static GameObject TallBox(Transform parent, string name, Vector3 floorPosition, Vector3 size, float visualHeight, float blockHeight, Material material)
     {
         GameObject box = Box(parent, name, floorPosition + Vector3.up * (visualHeight * 0.5f), new Vector3(size.x, visualHeight, size.z), material);
         var collider = box.GetComponent<BoxCollider>();
@@ -328,7 +333,7 @@ public static class ChaseTestSceneBuilder
         return box;
     }
 
-    static void BakeNavMesh()
+    internal static void BakeNavMesh(string assetName = "ChaseTest NavMesh")
     {
         var surface = new GameObject("NavMesh").AddComponent<NavMeshSurface>();
         surface.collectObjects = CollectObjects.All;
@@ -341,8 +346,8 @@ public static class ChaseTestSceneBuilder
         var sources = new List<NavMeshBuildSource>();
         NavMeshBuilder.CollectSources(bounds, ~0, NavMeshCollectGeometry.RenderMeshes, 0, new List<NavMeshBuildMarkup>(), sources);
         NavMeshData data = NavMeshBuilder.BuildNavMeshData(settings, sources, bounds, Vector3.zero, Quaternion.identity);
-        data.name = "ChaseTest NavMesh";
-        AssetDatabase.CreateAsset(data, TargetFolder + "/NavMesh.asset");
+        data.name = assetName;
+        AssetDatabase.CreateAsset(data, assetFolder + "/NavMesh.asset");
 
         surface.navMeshData = data;
         surface.RemoveData();
@@ -359,7 +364,7 @@ public static class ChaseTestSceneBuilder
 
     // 회전문: 빈 부모(경첩)가 회전축, 넉넉한 트리거로 접근 감지, 자식 문짝의 NavMeshObstacle(Carve)이 닫혀 있을 때 길을 막음.
     // 추격자는 같은 자리의 NavMeshLink로 지나감(문을 열고).
-    static void Door(Transform parent, string name, Axis axis, float fixedCoord, float along)
+    internal static void Door(Transform parent, string name, Axis axis, float fixedCoord, float along)
     {
         Quaternion rotation = WallRotation(axis);
         Vector3 center = WallPoint(axis, fixedCoord, along);
@@ -407,7 +412,7 @@ public static class ChaseTestSceneBuilder
     }
 
     // 창문·환풍구: 아버지 전용 통로 (벽을 넘어가거나 기어서 지나감)
-    static void Passage(Transform parent, string name, EntryKind kind, Axis axis, float fixedCoord, float along)
+    internal static void Passage(Transform parent, string name, EntryKind kind, Axis axis, float fixedCoord, float along)
     {
         var root = new GameObject($"{(kind == EntryKind.Window ? "Window" : "Vent")} ({name})");
         root.transform.SetParent(parent);
@@ -451,7 +456,7 @@ public static class ChaseTestSceneBuilder
 
     // ---------------- 숨는 곳 ----------------
 
-    static void Hide(Transform parent, string name, HidingKind kind, Vector3 point, int capacity = 1,
+    internal static void Hide(Transform parent, string name, HidingKind kind, Vector3 point, int capacity = 1,
         float enter = 0.6f, float exit = 0.4f, float noise = 3f, float exposed = 0f)
     {
         var go = new GameObject("Hide_" + name);
@@ -477,7 +482,7 @@ public static class ChaseTestSceneBuilder
 
     // ---------------- 캐릭터 ----------------
 
-    static GameObject BuildPlayer(string name, CharacterType type, Vector3 position, Color tint)
+    internal static GameObject BuildPlayer(string name, CharacterType type, Vector3 position, Color tint)
     {
         var player = new GameObject(name) { tag = "Player" };
         player.transform.position = position;
@@ -562,9 +567,9 @@ public static class ChaseTestSceneBuilder
     // ---------------- 기타 ----------------
 
     // 차분한 단색 머티리얼. 구조(바닥 < 벽 < 가구)가 명도 차이로 구분되도록 맞췄습니다.
-    static void CreateMaterials()
+    internal static void CreateMaterials()
     {
-        AssetDatabase.CreateFolder(TargetFolder, "Materials");
+        AssetDatabase.CreateFolder(assetFolder, "Materials");
         groundMat    = CreateMaterial("Ground_Grass", new Color(0.33f, 0.42f, 0.30f));
         wallMat      = CreateMaterial("Wall_Inner",   new Color(0.36f, 0.34f, 0.33f));
         outerWallMat = CreateMaterial("Wall_Outer",   new Color(0.24f, 0.23f, 0.24f));
@@ -582,14 +587,14 @@ public static class ChaseTestSceneBuilder
         chaserMat    = CreateMaterial("Chaser",       new Color(0.85f, 0.15f, 0.15f));
     }
 
-    static Material CreateMaterial(string name, Color color)
+    internal static Material CreateMaterial(string name, Color color)
     {
         Shader shader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
         var material = new Material(shader) { name = name };
         material.SetColor("_BaseColor", color);
         material.color = color;
         if (material.HasProperty("_Smoothness")) material.SetFloat("_Smoothness", 0.15f);
-        AssetDatabase.CreateAsset(material, $"{TargetFolder}/Materials/{name}.mat");
+        AssetDatabase.CreateAsset(material, $"{assetFolder}/Materials/{name}.mat");
         return material;
     }
 
