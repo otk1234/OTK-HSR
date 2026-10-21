@@ -16,6 +16,9 @@ namespace NarrativeGraybox.Player
         private float animationTime;
         private Vector3 restPosition;
         private float walkBlend;
+        private float animationSpeed = 1f; // [OTK 통합] 달리기 중 걷기 모션 배속
+
+        public void SetAnimationSpeed(float speed) { animationSpeed = Mathf.Max(0.1f, speed); } // [OTK 통합]
 
         public void Configure(Texture2D sheet)
         {
@@ -49,7 +52,7 @@ namespace NarrativeGraybox.Player
             }
             if (Application.isPlaying && isMoving)
             {
-                animationTime += Time.deltaTime;
+                animationTime += Time.deltaTime * animationSpeed; // [OTK 통합] 배속
                 ApplyDirection();
             }
         }

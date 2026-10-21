@@ -31,7 +31,7 @@ public static class PrototypeSceneBuilder
     public enum View { TopDown, Isometric }
 
     // 카메라 각도는 팀원의 시점 비교 씬과 같게 맞췄습니다.
-    static readonly Quaternion TopDownRotation = Quaternion.LookRotation(-new Vector3(0f, 16f, -10f));     // Test_TopView
+    public static readonly Quaternion TopDownRotation = Quaternion.LookRotation(-new Vector3(0f, 16f, -10f));     // Test_TopView
     static readonly Quaternion IsometricRotation = Quaternion.LookRotation(-new Vector3(-12f, 12f, -12f)); // Test_Isometric_2F
 
     struct Room
@@ -96,10 +96,12 @@ public static class PrototypeSceneBuilder
         if (AssetDatabase.LoadAssetAtPath<SceneAsset>(SourceScene) == null)
             throw new Exception("그레이박스 씬을 찾을 수 없습니다: " + SourceScene);
 
-        AssetDatabase.DeleteAsset(TargetScene);
         AssetDatabase.DeleteAsset(TargetFolder);
         AssetDatabase.CreateFolder("Assets/Scenes", "Prototype");
-        if (!AssetDatabase.CopyAsset(SourceScene, TargetScene))
+        // 씬 파일 내용만 덮어써서 .meta(GUID)는 유지합니다. (지웠다 새로 만들면 다시 만들 때마다 GUID가 바뀜)
+        System.IO.File.Copy(SourceScene, TargetScene, true);
+        AssetDatabase.ImportAsset(TargetScene, ImportAssetOptions.ForceUpdate);
+        if (AssetDatabase.LoadAssetAtPath<SceneAsset>(TargetScene) == null)
             throw new Exception("씬 복사 실패: " + TargetScene);
 
         var scene = EditorSceneManager.OpenScene(TargetScene, OpenSceneMode.Single);
@@ -238,8 +240,11 @@ public static class PrototypeSceneBuilder
         agent.obstacleAvoidanceType = ObstacleAvoidanceType.NoObstacleAvoidance;
 
         player.AddComponent<PlayerMovement>().cameraRelative = true;
+        player.AddComponent<PlayerStamina>();
+        player.AddComponent<FootstepNoise>();
         player.AddComponent<Inventory>();
         player.AddComponent<PlayerInteraction>().myType = type;
+        player.AddComponent<CharacterStatus>();
         return player;
     }
 
@@ -248,53 +253,62 @@ public static class PrototypeSceneBuilder
         Transform root = new GameObject("Room Cameras").transform;
 
         foreach (Room room in Rooms)
-        {
-            Quaternion rotation = room.view == View.Isometric ? IsometricRotation : TopDownRotation;
-            Vector3 forward = rotation * Vector3.forward;
-            Vector3 right = rotation * Vector3.right;
-            Vector3 up = rotation * Vector3.up;
-
-            var zone = new GameObject("Zone_" + room.id);
-            zone.transform.SetParent(root);
-            zone.transform.position = room.Center;
-            var box = zone.AddComponent<BoxCollider>();
-            box.isTrigger = true;
-            box.size = new Vector3(room.maxX - room.minX, 3f, room.maxZ - room.minZ);
-
-            var camObject = new GameObject($"Cam_{room.id} ({(room.view == View.Isometric ? "아이소메트릭" : "탑뷰")})");
-            camObject.transform.SetParent(zone.transform);
-            var cam = camObject.AddComponent<CinemachineCamera>();
-            cam.Priority = room.priority;
-
-            // 고정 카메라: 구역 전체가 화면에 들어오도록 크기와 위치를 계산
-            float minR = float.MaxValue, maxR = float.MinValue, minU = float.MaxValue, maxU = float.MinValue;
-            foreach (float x in new[] { room.minX, room.maxX })
-            foreach (float y in new[] { 0f, 2.2f })
-            foreach (float z in new[] { room.minZ, room.maxZ })
-            {
-                var corner = new Vector3(x, y, z);
-                float r = Vector3.Dot(corner, right), u = Vector3.Dot(corner, up);
-                minR = Mathf.Min(minR, r); maxR = Mathf.Max(maxR, r);
-                minU = Mathf.Min(minU, u); maxU = Mathf.Max(maxU, u);
-            }
-            Vector3 middle = right * ((minR + maxR) * 0.5f) + up * ((minU + maxU) * 0.5f) + forward * Vector3.Dot(room.Center, forward);
-            camObject.transform.SetPositionAndRotation(middle - forward * CameraDistance, rotation);
-
-            LensSettings lens = LensSettings.Default;
-            lens.ModeOverride = LensSettings.OverrideModes.Orthographic;
-            lens.OrthographicSize = Mathf.Max(MinViewSize, (maxU - minU) * 0.5f + 0.3f, ((maxR - minR) * 0.5f + 0.3f) / ScreenAspect);
-            lens.NearClipPlane = 0.1f;
-            lens.FarClipPlane = 100f;
-            cam.Lens = lens;
-            camObject.SetActive(false);
-
-            var trigger = zone.AddComponent<CameraTrigger>();
-            trigger.virtualCamera = camObject;
-            trigger.roomName = room.name;
-        }
+            BuildRoomZone(root, room.id, room.name, room.minX, room.maxX, room.minZ, room.maxZ, room.view, room.priority);
     }
 
-    static void BuildFadeCanvas()
+    // 구역 하나: 트리거(CameraTrigger) + 구역 전체가 보이는 고정 카메라. 추격 테스트 씬 생성기도 같이 씁니다.
+    public static CameraTrigger BuildRoomZone(Transform root, string id, string name, float minX, float maxX, float minZ, float maxZ,
+        View view = View.TopDown, int priority = 0, string buildingId = "House", int floor = 0)
+    {
+        Quaternion rotation = view == View.Isometric ? IsometricRotation : TopDownRotation;
+        Vector3 forward = rotation * Vector3.forward;
+        Vector3 right = rotation * Vector3.right;
+        Vector3 up = rotation * Vector3.up;
+        var center = new Vector3((minX + maxX) * 0.5f, 1.5f, (minZ + maxZ) * 0.5f);
+
+        var zone = new GameObject("Zone_" + id);
+        zone.transform.SetParent(root);
+        zone.transform.position = center;
+        var box = zone.AddComponent<BoxCollider>();
+        box.isTrigger = true;
+        box.size = new Vector3(maxX - minX, 3f, maxZ - minZ);
+
+        var camObject = new GameObject($"Cam_{id} ({(view == View.Isometric ? "아이소메트릭" : "탑뷰")})");
+        camObject.transform.SetParent(zone.transform);
+        var cam = camObject.AddComponent<CinemachineCamera>();
+        cam.Priority = priority;
+
+        // 고정 카메라: 구역 전체가 화면에 들어오도록 크기와 위치를 계산
+        float minR = float.MaxValue, maxR = float.MinValue, minU = float.MaxValue, maxU = float.MinValue;
+        foreach (float x in new[] { minX, maxX })
+        foreach (float y in new[] { 0f, 2.2f })
+        foreach (float z in new[] { minZ, maxZ })
+        {
+            var corner = new Vector3(x, y, z);
+            float r = Vector3.Dot(corner, right), u = Vector3.Dot(corner, up);
+            minR = Mathf.Min(minR, r); maxR = Mathf.Max(maxR, r);
+            minU = Mathf.Min(minU, u); maxU = Mathf.Max(maxU, u);
+        }
+        Vector3 middle = right * ((minR + maxR) * 0.5f) + up * ((minU + maxU) * 0.5f) + forward * Vector3.Dot(center, forward);
+        camObject.transform.SetPositionAndRotation(middle - forward * CameraDistance, rotation);
+
+        LensSettings lens = LensSettings.Default;
+        lens.ModeOverride = LensSettings.OverrideModes.Orthographic;
+        lens.OrthographicSize = Mathf.Max(MinViewSize, (maxU - minU) * 0.5f + 0.3f, ((maxR - minR) * 0.5f + 0.3f) / ScreenAspect);
+        lens.NearClipPlane = 0.1f;
+        lens.FarClipPlane = 100f;
+        cam.Lens = lens;
+        camObject.SetActive(false);
+
+        var trigger = zone.AddComponent<CameraTrigger>();
+        trigger.virtualCamera = camObject;
+        trigger.roomName = name;
+        trigger.buildingId = buildingId;
+        trigger.floor = floor;
+        return trigger;
+    }
+
+    public static void BuildFadeCanvas()
     {
         var root = new GameObject("Fade Canvas");
         var canvas = root.AddComponent<Canvas>();
@@ -465,7 +479,7 @@ public static class PrototypeSceneBuilder
         visual.GetComponent<SpriteRenderer>().color = new Color(0.8f, 0.85f, 0.8f);
     }
 
-    static Material LoadMaterial(string name)
+    public static Material LoadMaterial(string name)
     {
         var material = AssetDatabase.LoadAssetAtPath<Material>($"{MaterialFolder}/{name}.mat");
         if (material == null) Debug.LogWarning("[OTK] 머티리얼을 찾지 못했습니다: " + name);
@@ -474,7 +488,9 @@ public static class PrototypeSceneBuilder
 
     static void AddToBuildSettings()
     {
-        var scenes = EditorBuildSettings.scenes.Where(s => s.path != TargetScene).ToList();
+        // 경로로 다시 만들어서 GUID를 현재 값으로 맞춥니다.
+        var scenes = EditorBuildSettings.scenes.Where(s => s.path != TargetScene)
+            .Select(s => new EditorBuildSettingsScene(s.path, s.enabled)).ToList();
         scenes.Insert(0, new EditorBuildSettingsScene(TargetScene, true));
         EditorBuildSettings.scenes = scenes.ToArray();
     }

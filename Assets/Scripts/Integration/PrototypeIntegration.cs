@@ -62,12 +62,14 @@ public class PrototypeIntegration : MonoBehaviour
     {
         GameMessage.Shown += OnMessage;
         GameMessage.PromptChanged += OnPrompt;
+        GameStateManager.StateChanged += OnGameStateChanged;
     }
 
     void OnDisable()
     {
         GameMessage.Shown -= OnMessage;
         GameMessage.PromptChanged -= OnPrompt;
+        GameStateManager.StateChanged -= OnGameStateChanged;
     }
 
     void Start()
@@ -91,12 +93,16 @@ public class PrototypeIntegration : MonoBehaviour
 
         bool fading = FadeManager.instance.isFading;
         PlayerInteractor3D interactor = active.GetComponent<PlayerInteractor3D>();
-        interactor.ExternalLock = fading; // 화면 전환 중에는 조사·대화를 시작하지 않음
+        // IsBusy에는 ExternalLock도 포함되므로, 조사·대화 중인지는 잠금을 풀어 둔 상태에서 읽습니다.
+        interactor.ExternalLock = false;
+        bool engaged = interactor.IsBusy;
+        // 화면 전환 중·추격 중에는 조사·대화를 시작하지 않음
+        interactor.ExternalLock = fading || GameStateManager.IsChase;
 
-        bool busy = interactor.IsBusy || hud.Selecting || restoringCamera;
-        CharacterManager.instance.inputLocked = busy;
-        active.GetComponent<PlayerInteraction>().inputLocked = busy;
-        active.GetComponent<PlayerMovement>().SetMovementEnabled(!busy);
+        // 이유별 잠금: 숨기·잡힘 같은 다른 시스템의 잠금을 덮어쓰지 않습니다.
+        SetLock(active, LockReason.Inspection, engaged);
+        SetLock(active, LockReason.InventoryMenu, hud.Selecting);
+        SetLock(active, LockReason.CameraTransition, restoringCamera);
 
         if (interactor.IsInspecting != wasInspecting)
         {
@@ -113,6 +119,27 @@ public class PrototypeIntegration : MonoBehaviour
             completeShown = true;
             GameMessage.Show(completeMessage);
         }
+    }
+
+    static void SetLock(GameObject player, LockReason reason, bool locked)
+    {
+        CharacterManager.instance.SwitchLocks.Set(reason, locked);
+        player.GetComponent<PlayerInteraction>().Locks.Set(reason, locked);
+        player.GetComponent<PlayerMovement>().Locks.Set(reason, locked);
+    }
+
+    // 추격이 시작되면 하던 조사·대화를 바로 끝냅니다.
+    void OnGameStateChanged(GameState state)
+    {
+        if (state != GameState.Chase || currentActive == null) return;
+        PlayerInteractor3D interactor = currentActive.GetComponent<PlayerInteractor3D>();
+        interactor.ExternalLock = false;
+        if (interactor.IsInspecting)
+        {
+            interactor.Back(); // 선택 해제
+            if (interactor.IsInspecting) interactor.Back(); // 조사 종료
+        }
+        else if (interactor.IsBusy) interactor.EndTalk();
     }
 
     void OnActivePlayerChanged(GameObject active)
@@ -164,6 +191,14 @@ public class PrototypeIntegration : MonoBehaviour
     // 조사 끝: 페이드로 가리고 구역 카메라로 돌아옵니다.
     IEnumerator EndInspectionCamera()
     {
+        if (GameStateManager.InstantCameraCuts)
+        {
+            // 추격 중: 페이드 없이 바로 구역 카메라로
+            inspectionCamera.enabled = false;
+            cameraBrain.enabled = true;
+            yield break;
+        }
+
         restoringCamera = true;
         FadeManager fade = FadeManager.instance;
         fade.isFading = true;
@@ -238,7 +273,7 @@ public class PrototypeIntegration : MonoBehaviour
         float width = Screen.width / scale;
         GUI.color = new Color(1f, 1f, 1f, 0.8f);
         GUI.Label(new Rect(width * 0.5f - 320, 30, 640, 24),
-            "WASD 이동    E 상호작용 · 조사    Tab 캐릭터 전환    R 소지품", centeredStyle);
+            "WASD 이동    Shift 달리기    E 상호작용 · 조사    F 문 잠금    Tab 캐릭터 전환    R 소지품", centeredStyle);
 
         GUI.matrix = previousMatrix;
         GUI.color = previousColor;

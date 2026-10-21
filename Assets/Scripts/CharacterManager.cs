@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using UnityEngine;
 
@@ -12,10 +13,19 @@ public class CharacterManager : MonoBehaviour
     // 현재 조종 중인 캐릭터의 인덱스 (0 = 첫 번째, 1 = 두 번째)
     private int activePlayerIndex = 0;
 
-    // 조사·대화 중처럼 캐릭터를 바꾸면 안 될 때 외부에서 켭니다.
-    [HideInInspector] public bool inputLocked = false;
+    // 조사·대화 중처럼 캐릭터를 바꾸면 안 될 때, 이유별로 잠급니다.
+    public readonly LockSet SwitchLocks = new LockSet();
+
+    // 예전 방식 호환용 (읽으면 어떤 이유로든 잠겨 있는지)
+    public bool inputLocked
+    {
+        get => SwitchLocks.IsLocked;
+        set => SwitchLocks.Set(LockReason.Legacy, value);
+    }
 
     public int ActivePlayerIndex => activePlayerIndex;
+
+    public event Action<GameObject> ActivePlayerChanged;
 
     void Awake()
     {
@@ -34,14 +44,15 @@ public class CharacterManager : MonoBehaviour
     {
 
         if (FadeManager.instance != null && FadeManager.instance.isFading) return;
-        if (inputLocked) return;
+        if (SwitchLocks.IsLocked) return;
 
         // Tab 키를 누르면 다음 캐릭터로 전환합니다.
         if (Input.GetKeyDown(KeyCode.Tab))
         {
             // 0이면 1로, 1이면 0으로 바뀝니다.
             int nextIndex = (activePlayerIndex + 1) % players.Length;
-            StartCoroutine(SwitchWithFadeCoroutine(nextIndex));
+            if (GameStateManager.InstantCameraCuts) SwitchInstant(nextIndex); // 추격 중에는 페이드 없이 바로 컷
+            else StartCoroutine(SwitchWithFadeCoroutine(nextIndex));
         }
     }
 
@@ -55,13 +66,7 @@ public class CharacterManager : MonoBehaviour
 
 
         SwitchPlayer(nextIndex);
-
-
-        CameraTrigger[] triggers = FindObjectsByType<CameraTrigger>(FindObjectsSortMode.None);
-        foreach (var t in triggers)
-        {
-            t.UpdateCameraStateInstant();
-        }
+        RefreshRoomCameras();
 
 
         yield return null;
@@ -72,6 +77,21 @@ public class CharacterManager : MonoBehaviour
 
         yield return StartCoroutine(FadeManager.instance.FadeIn());
         FadeManager.instance.isFading = false;
+    }
+
+    // 페이드 없이 바로 전환 (추격 상태)
+    public void SwitchInstant(int index)
+    {
+        SwitchPlayer(index);
+        RefreshRoomCameras();
+    }
+
+    static void RefreshRoomCameras()
+    {
+        foreach (CameraTrigger t in CameraTrigger.All)
+        {
+            t.UpdateCameraStateInstant();
+        }
     }
 
     void SwitchPlayer(int index)
@@ -87,6 +107,8 @@ public class CharacterManager : MonoBehaviour
                 movement.enabled = (i == activePlayerIndex);
             }
         }
+
+        ActivePlayerChanged?.Invoke(players[activePlayerIndex]);
     }
 
 
