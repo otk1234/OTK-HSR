@@ -36,6 +36,7 @@ public sealed class PlannerReferenceDemo : MonoBehaviour
         if (originalHud != null) originalHud.enabled = false;
 
         var integration = FindFirstObjectByType<PrototypeIntegration>();
+        integration.EnableOverviewCameraFollow();
         PrototypeFloorTravel.EnsureCreated(integration);
         CreateSaveBed();
 
