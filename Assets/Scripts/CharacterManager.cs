@@ -12,6 +12,11 @@ public class CharacterManager : MonoBehaviour
     // 현재 조종 중인 캐릭터의 인덱스 (0 = 첫 번째, 1 = 두 번째)
     private int activePlayerIndex = 0;
 
+    // 조사·대화 중처럼 캐릭터를 바꾸면 안 될 때 외부에서 켭니다.
+    [HideInInspector] public bool inputLocked = false;
+
+    public int ActivePlayerIndex => activePlayerIndex;
+
     void Awake()
     {
         // 게임 시작 시 자신을 등록합니다.
@@ -29,6 +34,7 @@ public class CharacterManager : MonoBehaviour
     {
 
         if (FadeManager.instance != null && FadeManager.instance.isFading) return;
+        if (inputLocked) return;
 
         // Tab 키를 누르면 다음 캐릭터로 전환합니다.
         if (Input.GetKeyDown(KeyCode.Tab))

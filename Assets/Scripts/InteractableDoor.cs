@@ -18,7 +18,9 @@ public class InteractableDoor : MonoBehaviour
 
     private bool isOpen = false;    
     private bool isMoving = false;   
-    private Quaternion closedRotation; 
+    private Quaternion closedRotation;
+
+    public bool IsOpen => isOpen;
 
     void Start()
     {
@@ -36,18 +38,18 @@ public class InteractableDoor : MonoBehaviour
        
             if (string.IsNullOrEmpty(requiredItemName) || playerInventory.HasItem(requiredItemName))
             {
-                Debug.Log($"[문] {openedMessage}");
+                GameMessage.Show(openedMessage);
                 StartCoroutine(MoveDoorRoutine(true));
             }
             else
             {
-                Debug.Log($"[문] {lockedMessage}");
+                GameMessage.Show(lockedMessage);
             }
         }
         else
         {
           
-            Debug.Log($"[문] {closedMessage}");
+            GameMessage.Show(closedMessage);
             StartCoroutine(MoveDoorRoutine(false));
         }
     }
