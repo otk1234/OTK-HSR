@@ -35,6 +35,8 @@ public class PrototypeIntegration : MonoBehaviour
 
     [Header("팀원 그레이박스 쪽")]
     public SimpleGameHud hud;
+    // 다른 HUD(예: 기획 참고 씬)가 소지품 선택 중일 때 true를 돌려주면 이동·전환을 잠근다
+    public System.Func<bool> ExtraBusy;
     public IsometricCameraFollow inspectionCamera; // 조사할 때 클로즈업 연출
     public CameraOcclusionFader occlusionFader;    // 캐릭터를 가리는 벽 숨김
 
@@ -97,9 +99,10 @@ public class PrototypeIntegration : MonoBehaviour
 
         bool fading = FadeManager.instance.isFading;
         PlayerInteractor3D interactor = active.GetComponent<PlayerInteractor3D>();
-        interactor.ExternalLock = fading; // 화면 전환 중에는 조사·대화를 시작하지 않음
+        bool extraBusy = ExtraBusy != null && ExtraBusy();
+        interactor.ExternalLock = fading || extraBusy; // 화면 전환 중·다른 HUD가 입력을 쓰는 중에는 조사·대화를 시작하지 않음
 
-        bool busy = interactor.IsBusy || hud.Selecting || restoringCamera;
+        bool busy = interactor.IsBusy || hud.Selecting || restoringCamera || extraBusy;
         CharacterManager.instance.inputLocked = busy;
         active.GetComponent<PlayerInteraction>().inputLocked = busy;
         active.GetComponent<PlayerMovement>().SetMovementEnabled(!busy);

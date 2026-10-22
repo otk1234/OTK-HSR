@@ -36,10 +36,14 @@ public class InteractableDoor : MonoBehaviour
         if (!isOpen)
         {
        
-            if (string.IsNullOrEmpty(requiredItemName) || playerInventory.HasItem(requiredItemName))
+            if (string.IsNullOrEmpty(requiredItemName) || playerInventory.CanUse(requiredItemName))
             {
                 GameMessage.Show(openedMessage);
                 StartCoroutine(MoveDoorRoutine(true));
+            }
+            else if (playerInventory.HasItem(requiredItemName))
+            {
+                GameMessage.Show(requiredItemName + "을(를) 손에 들어야 한다.");
             }
             else
             {

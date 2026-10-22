@@ -22,6 +22,13 @@ namespace NarrativeGraybox.Interaction
         public InspectionItem Selected => selected;
         // [OTK 통합] true를 돌려주면(근처에 아이템·문이 있음) 조사/대화 입력을 양보한다.
         public System.Func<bool> HasPriorityInteraction;
+        // [OTK 통합] 다른 UI가 대화·조사 화면을 대신 그릴 때 쓰는 연결 지점
+        public bool HideDefaultUI { get; set; } // [OTK 통합] true면 아래 OnGUI 기본 화면을 그리지 않음
+        public System.Func<bool> TalkAdvance; // [OTK 통합] 대화 중 E: true를 돌려주면(다음 줄·글자 모두 보이기) 대화를 닫지 않음
+        public DummyNpc TalkingTo => talkingTo; // [OTK 통합]
+        public InspectionArea Area => area; // [OTK 통합]
+        public InspectionItem Hovered => hovered; // [OTK 통합]
+        public string Notice => notice; // [OTK 통합]
         // [OTK 통합] 이동을 NavMesh 시스템이 맡는 경우 playerController가 비어 있을 수 있다.
         private void SetPlayerMovement(bool enabled){if(playerController!=null)playerController.SetMovementEnabled(enabled);}
         public void Configure(IsometricCameraFollow cameraFollow, IsometricPlayerController movement, SimpleGameHud gameHud)
@@ -31,6 +38,7 @@ namespace NarrativeGraybox.Interaction
             if(ExternalLock)return;
             if(talkingTo!=null)
             {
+                if(Input.GetKeyDown(KeyCode.E)&&TalkAdvance!=null&&TalkAdvance())return; // [OTK 통합]
                 if(Input.GetKeyDown(KeyCode.E)||Input.GetKeyDown(KeyCode.Q)||Input.GetKeyDown(KeyCode.Escape))EndTalk();
                 return;
             }
@@ -120,6 +128,7 @@ namespace NarrativeGraybox.Interaction
         private Rect PanelRect()=>new Rect(Screen.width*.2f,Screen.height-175*UiScale,Screen.width*.6f,155*UiScale);
         private void OnGUI()
         {
+            if(HideDefaultUI)return; // [OTK 통합]
             if(talkingTo!=null)
             {
                 float scale=UiScale;Rect r=PanelRect();Color previous=GUI.color;
