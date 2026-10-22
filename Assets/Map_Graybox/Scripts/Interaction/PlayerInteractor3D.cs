@@ -57,6 +57,7 @@ namespace NarrativeGraybox.Interaction
                 foreach(var candidate in Object.FindObjectsByType<InspectionArea>(FindObjectsSortMode.None))
                 {
                     float distance=(candidate.transform.position-transform.position).sqrMagnitude;
+                    if(distance<closest&&!CanSeeArea(candidate))continue; // [OTK 통합] 벽·닫힌 문 너머 조사 지점은 제외
                     if(distance<closest){nearest=candidate;closest=distance;}
                 }
                 hud.SetInteractionPrompt(hud.Selecting?"[← →] 선택   [R] 장착   [Q] 취소":nearest==null?"[R] 소지품":"[E] 조사   [R] 소지품");
@@ -80,6 +81,11 @@ namespace NarrativeGraybox.Interaction
             }
             if(hovered!=hitItem){if(hovered!=null)hovered.SetHover(false);hovered=hitItem;if(hovered!=null)hovered.SetHover(true);}
             if(Input.GetMouseButtonDown(0)&&hovered!=null)Select(hovered);
+        }
+        private bool CanSeeArea(InspectionArea candidate) // [OTK 통합] 대화(NPC)와 같은 방식의 가림 판정
+        {
+            if(!Physics.Linecast(transform.position,candidate.transform.position+Vector3.up*.5f,out var obstruction,~0,QueryTriggerInteraction.Ignore))return true; // [OTK 통합]
+            return obstruction.collider.GetComponentInParent<InspectionArea>()==candidate||obstruction.collider.CompareTag("Player"); // [OTK 통합]
         }
         public void BeginTalk(DummyNpc npc)
         {

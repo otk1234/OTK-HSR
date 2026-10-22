@@ -64,6 +64,19 @@ public static class CrimeSceneTestSceneValidator
         }
         var heavy = Object.FindAnyObjectByType<HeavyObject>();
         if (heavy == null || heavy.requiredCharacter != CharacterType.Player2 || heavy.revealWhenMoved.Length == 0) problems.Add("책장(오빠 전용 무거운 물건) 설정 안 됨");
+        var board = Object.FindAnyObjectByType<DeductionBoard>();
+        if (board == null || board.deduction == null || board.timer == null) problems.Add("추리 창(DeductionBoard) 연결 안 됨");
+        else
+        {
+            var clueIds = new HashSet<string>(clues.Select(c => c.clueId));
+            foreach (CaseDeduction.Question q in board.deduction.questions)
+            {
+                if (!q.options.Any(o => o.correct)) problems.Add($"추리 '{q.id}': 정답 없음");
+                foreach (CaseDeduction.Option o in q.options)
+                    foreach (string id in o.needAnyClue)
+                        if (!clueIds.Contains(id)) problems.Add($"추리 '{q.id}': 씬에 없는 단서 {id}");
+            }
+        }
         var machine = Object.FindAnyObjectByType<RepairableMachine>();
         if (machine == null || machine.requiredCharacter != CharacterType.Player2 || machine.revealWhenRepaired.Length == 0) problems.Add("녹화기(오빠 전용 기계) 설정 안 됨");
 
@@ -186,6 +199,18 @@ public static class CrimeSceneTestSceneValidator
         manager.SwitchInstant(0);
         yield return 0.2f;
 
+        // ---- 벽 너머 조사 지점은 잡히지 않음 (현관에서 벽 건너 욕조) ----
+        var hud = Object.FindAnyObjectByType<NarrativeGraybox.UI.SimpleGameHud>();
+        var promptField = typeof(NarrativeGraybox.UI.SimpleGameHud).GetField("interactionMessage", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        string Prompt() => (string)promptField.GetValue(hud);
+        Place(sister, new Vector3(3.6f, 0f, 3.8f));
+        yield return 0.4f;
+        Check(Vector3.Distance(sister.transform.position, Area("욕조").transform.position) < 2.4f && !Prompt().Contains("조사"),
+            $"현관에서 벽 건너 욕조는 조사 대상이 아님 (안내: {Prompt()})");
+        Place(sister, new Vector3(1.4f, 0f, 3.4f));
+        yield return 0.4f;
+        Check(Prompt().Contains("조사"), $"욕실 안에서는 욕조 조사 가능 (안내: {Prompt()})");
+
         // ---- 조사 화면에서 살펴본 단서가 사건 파일에 기록 ----
         Place(sister, new Vector3(-3.6f, 0f, -2.2f));
         yield return 0.3f;
@@ -246,12 +271,40 @@ public static class CrimeSceneTestSceneValidator
         foreach (float s in Inspect(brother, video, "intercom_video")) yield return s;
         Check(CaseFile.Has("intercom_video") && CaseFile.Entries.Count == 4, $"녹화 영상 기록 (단서 {CaseFile.Entries.Count}개)");
 
-        // ---- 시간 종료 ----
+        // ---- 추리 (지금 단서: 시체·섬유·수첩·녹화 영상, 찻잔·상처는 없음 / 조작 중 = 오빠) ----
+        var board = Object.FindAnyObjectByType<DeductionBoard>();
+        CaseDeduction data = board.deduction;
+        board.Open();
+        yield return 0.2f;
+        Check(board.IsOpen && brother.GetComponent<PlayerMovement>().Locks.Has(LockReason.Deduction) && manager.SwitchLocks.Has(LockReason.Deduction)
+              && !brother.GetComponent<PlayerInteractor3D>().enabled, "추리 창이 열리면 이동·전환·조사 잠김");
+        Check(board.CurrentQuestion.id == "relation" && !board.Choose(1) && !CaseState.HasAnswered(data.caseId, "relation"),
+            "근거 단서(찻잔·상처)가 없으면 '아는 사이' 선택지를 고를 수 없음");
+        Check(board.Choose(0) && CaseState.TryGet(data.caseId, "relation", out CaseState.Answer wrong) && !wrong.correct && CaseState.NextCaseErrors.Count == 1,
+            "오답도 진행됨 → 다음 사건 큰 오류로 기록");
+        CaseDeduction.Question relation = data.Find("relation");
+        Check(!CaseState.Record(data.caseId, relation, relation.options[2], CharacterType.Player2) && board.CurrentQuestion.id == "culprit",
+            "한 번 답한 질문은 바꿀 수 없음 → 다음 질문");
+        CaseDeduction.Question culprit = data.Find("culprit");
+        List<CaseDeduction.Option> sisterView = board.VisibleOptions(culprit, CharacterType.Player1), brotherView = board.VisibleOptions(culprit, CharacterType.Player2);
+        Check(sisterView.Count == 4 && brotherView.Count == 3 && sisterView[1].onlyFor == CharacterType.Player1 && sisterView[1].Unlocked,
+            "여동생에게만 '섬유' 근거 선택지가 보임 (오빠는 녹화 영상 근거만)");
+        Check(board.Choose(1) && CaseState.TryGet(data.caseId, "culprit", out CaseState.Answer culpritAnswer) && culpritAnswer.correct && culpritAnswer.answeredBy == CharacterType.Player2,
+            "오빠가 녹화 영상 근거로 '아빠' 정답");
+        Check(board.Choose(0) && board.CurrentQuestion == null && CaseState.Answers.Count == 3, "수첩 근거로 다음 범행 정답 → 추리 완료");
+        board.Close();
+        yield return 0.2f;
+        Check(!board.IsOpen && !brother.GetComponent<PlayerMovement>().Locks.IsLocked && !manager.SwitchLocks.IsLocked && brother.GetComponent<PlayerInteractor3D>().enabled,
+            "추리 창을 닫으면 잠금 풀림");
+
+        // ---- 시간 종료 → 추리 창 자동으로 열림 ----
         bool timeUp = false;
         timer.TimeUp += () => timeUp = true;
         timer.SetRemaining(0.3f);
         yield return 0.6f;
         Check(timer.Expired && timeUp && timer.Remaining == 0f, "제한 시간이 끝나면 TimeUp 이벤트 (추격자는 아직 없음)");
+        Check(board.IsOpen, "시간이 끝나면 추리 창이 자동으로 열림");
+        board.Close();
         Check(GuiltSystem.Value == 50, "조사만으로는 죄책감이 바뀌지 않음");
     }
 }

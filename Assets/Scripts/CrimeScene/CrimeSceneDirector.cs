@@ -44,7 +44,7 @@ public class CrimeSceneDirector : MonoBehaviour
             text.AppendLine(timer.Expired ? "<color=#ff6666>제한 시간 종료</color>" : $"남은 시간 {seconds / 60}:{seconds % 60:00}");
         }
         text.AppendLine($"죄책감 {GuiltSystem.Value} ({GuiltSystem.TierName})");
-        text.AppendLine($"단서 {CaseFile.Entries.Count}개");
+        text.AppendLine($"단서 {CaseFile.Entries.Count}개   <color=#bbbbbb>[J] 추리 창</color>");
         foreach (CaseFile.Entry entry in CaseFile.Entries) text.AppendLine($" · {entry.title}");
 
         var box = new Rect(Screen.width - 268, 150, 256, 96 + CaseFile.Entries.Count * 17);
@@ -52,5 +52,22 @@ public class CrimeSceneDirector : MonoBehaviour
         GUI.DrawTexture(box, Texture2D.whiteTexture);
         GUI.color = Color.white;
         GUI.Label(new Rect(box.x + 8, box.y + 4, box.width - 16, box.height - 8), text.ToString(), style);
+
+        // 시연 자막 (에디터 시연 스크립트가 씀). 화면 위쪽 가운데, 조작 안내 아래
+        if (!string.IsNullOrEmpty(ChaseDebugOverlay.Caption))
+        {
+            if (captionStyle == null)
+            {
+                captionStyle = new GUIStyle(GUI.skin.label) { fontSize = 19, wordWrap = true, richText = true, alignment = TextAnchor.MiddleCenter };
+                captionStyle.normal.textColor = Color.white;
+            }
+            var caption = new Rect(Screen.width * 0.5f - 400, 62, 800, 92);
+            GUI.color = new Color(0f, 0f, 0f, 0.8f);
+            GUI.DrawTexture(caption, Texture2D.whiteTexture);
+            GUI.color = Color.white;
+            GUI.Label(new Rect(caption.x + 12, caption.y + 6, caption.width - 24, caption.height - 12), ChaseDebugOverlay.Caption, captionStyle);
+        }
     }
+
+    private GUIStyle captionStyle;
 }

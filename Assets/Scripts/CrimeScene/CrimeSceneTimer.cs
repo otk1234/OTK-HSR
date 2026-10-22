@@ -27,11 +27,12 @@ public class CrimeSceneTimer : MonoBehaviour
         if (Remaining <= 0f) Finish();
     }
 
-    // 점검·연출용
+    // 점검·연출용 (0보다 크게 주면 끝난 타이머도 다시 흐름)
     public void SetRemaining(float seconds)
     {
         Remaining = seconds;
-        if (Remaining <= 0f && !Expired) Finish();
+        Expired = false;
+        if (Remaining <= 0f) Finish();
     }
 
     void Finish()

@@ -186,6 +186,9 @@ public static class CrimeSceneTestSceneBuilder
 
             var timer = systems.AddComponent<CrimeSceneTimer>();
             systems.AddComponent<CrimeSceneDirector>().timer = timer;
+            var board = systems.AddComponent<DeductionBoard>();
+            board.deduction = EnsureDeductionAsset();
+            board.timer = timer;
 
             EditorSceneManager.SaveScene(scene, TargetScene);
             AddToBuildSettings();
@@ -439,6 +442,23 @@ public static class CrimeSceneTestSceneBuilder
         fiberMat      = B.CreateMaterial("Navy_Fiber",  new Color(0.10f, 0.14f, 0.40f));
         cupMat        = B.CreateMaterial("Cup",         new Color(0.95f, 0.95f, 0.93f));
         strokeMat     = PrototypeSceneBuilder.LoadMaterial("InspectStroke");
+    }
+
+    // 추리 데이터는 씬 폴더 밖에 두어, 씬을 다시 만들어도 기획이 고친 내용이 남게 함 (없을 때만 임시 사건으로 만듦)
+    public const string DeductionAsset = "Assets/Data/Cases/Case302_Deduction.asset";
+
+    public static CaseDeduction EnsureDeductionAsset()
+    {
+        var asset = AssetDatabase.LoadAssetAtPath<CaseDeduction>(DeductionAsset);
+        if (asset != null) return asset;
+        if (!AssetDatabase.IsValidFolder("Assets/Data")) AssetDatabase.CreateFolder("Assets", "Data");
+        if (!AssetDatabase.IsValidFolder("Assets/Data/Cases")) AssetDatabase.CreateFolder("Assets/Data", "Cases");
+        asset = ScriptableObject.CreateInstance<CaseDeduction>();
+        asset.FillCase302();
+        AssetDatabase.CreateAsset(asset, DeductionAsset);
+        AssetDatabase.SaveAssets();
+        Debug.Log("[OTK] 임시 사건 추리 데이터 생성: " + DeductionAsset);
+        return asset;
     }
 
     static void AddToBuildSettings()
