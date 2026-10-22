@@ -11,6 +11,7 @@ public enum LockReason
     Hiding,           // 숨는 곳 안
     Caught,           // 추격자에게 잡힘
     Scripted,         // 연출·이벤트
+    Working,          // 무거운 물건 밀기·기계 수리 같은 동작 중
 }
 
 public class LockSet

@@ -336,7 +336,7 @@ public static class PrototypeSceneBuilder
     }
 
     // 화면 하단 가운데(HUD 좌우 패널 사이)에 대사 패널을 만듭니다.
-    static DialogueManager BuildDialogueCanvas()
+    internal static DialogueManager BuildDialogueCanvas()
     {
         Font font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
 

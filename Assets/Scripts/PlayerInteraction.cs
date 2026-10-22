@@ -21,12 +21,15 @@ public class PlayerInteraction : MonoBehaviour
     private InteractableItem nearbyItem = null;
     private InteractableDoor nearbyDoor = null;
     private HidingSpot nearbyHidingSpot = null;
+    private CharacterInteractable nearbyInteractable = null; // 무거운 물건·기계 등
 
     private Inventory myInventory;
     private CharacterStatus status;
 
+    bool InteractableReady => nearbyInteractable != null && (nearbyInteractable.Available || nearbyInteractable.Busy);
+
     // 근처에 줍거나 열 수 있는 대상이 있는가 (있으면 그레이박스 조사보다 먼저 처리)
-    public bool HasTarget => nearbyItem != null || nearbyDoor != null || nearbyHidingSpot != null || (status != null && status.IsHidden);
+    public bool HasTarget => nearbyItem != null || InteractableReady || nearbyDoor != null || nearbyHidingSpot != null || (status != null && status.IsHidden);
 
     void Start()
     {
@@ -54,6 +57,7 @@ public class PlayerInteraction : MonoBehaviour
             (nearbyDoor == null || Distance(nearbyHidingSpot.transform) < Distance(nearbyDoor.transform));
 
         if (nearbyItem != null) GameMessage.Prompt($"[E] {nearbyItem.itemName} 줍기");
+        else if (InteractableReady) GameMessage.Prompt(nearbyInteractable.Prompt);
         else if (hidingFirst) GameMessage.Prompt(nearbyHidingSpot.CanEnter(status) ? $"[E] {nearbyHidingSpot.displayName}에 숨기" : $"{nearbyHidingSpot.displayName}: 자리가 없다");
         else if (nearbyDoor != null) GameMessage.Prompt(DoorPrompt());
 
@@ -71,6 +75,12 @@ public class PlayerInteraction : MonoBehaviour
                 {
                     GameMessage.Show(nearbyItem.failMessage);
                 }
+            }
+
+            // 2순위: 캐릭터 전용 상호작용 (밀기·고치기)
+            else if (InteractableReady)
+            {
+                nearbyInteractable.Use(this);
             }
 
             else if (hidingFirst)
@@ -110,6 +120,11 @@ public class PlayerInteraction : MonoBehaviour
             nearbyDoor = other.GetComponent<InteractableDoor>();
         }
 
+        else if (other.TryGetComponent(out CharacterInteractable interactable))
+        {
+            nearbyInteractable = interactable;
+        }
+
         else
         {
             HidingSpot spot = other.GetComponent<HidingSpot>();
@@ -127,6 +142,11 @@ public class PlayerInteraction : MonoBehaviour
         else if (other.CompareTag("Door") && nearbyDoor != null && other.gameObject == nearbyDoor.gameObject)
         {
             nearbyDoor = null;
+        }
+
+        else if (nearbyInteractable != null && other.gameObject == nearbyInteractable.gameObject)
+        {
+            nearbyInteractable = null;
         }
 
         else if (nearbyHidingSpot != null && other.gameObject == nearbyHidingSpot.gameObject)

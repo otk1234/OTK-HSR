@@ -87,7 +87,11 @@ public class GameStateManager : MonoBehaviour
         RestartPending = true;
         yield return new WaitForSeconds(restartDelay);
         Scene scene = SceneManager.GetActiveScene();
-        if (scene.buildIndex >= 0) SceneManager.LoadScene(scene.buildIndex);
+        if (scene.buildIndex >= 0)
+        {
+            GuiltSystem.RestoreCheckpoint();   // 죄책감은 체크포인트(지금은 씬 시작) 값으로
+            SceneManager.LoadScene(scene.buildIndex);
+        }
         else Debug.LogWarning("[추격] 빌드 설정에 없는 씬이라 다시 시작할 수 없습니다: " + scene.path);
     }
 

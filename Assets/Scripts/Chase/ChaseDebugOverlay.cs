@@ -44,7 +44,8 @@ public class ChaseDebugOverlay : MonoBehaviour
 
         var text = new StringBuilder();
         bool chase = GameStateManager.IsChase;
-        text.AppendLine(chase ? "<color=#ff5555><b>■ 추격 상태</b></color>" : "<color=#88ddff><b>■ 추리 상태</b></color>");
+        text.AppendLine((chase ? "<color=#ff5555><b>■ 추격 상태</b></color>" : "<color=#88ddff><b>■ 추리 상태</b></color>")
+                        + $"   죄책감 {GuiltSystem.Value} ({GuiltSystem.TierName})");
 
         foreach (CharacterStatus character in CharacterStatus.All)
         {
