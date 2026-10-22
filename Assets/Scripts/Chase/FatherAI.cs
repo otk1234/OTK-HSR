@@ -12,6 +12,9 @@ using UnityEngine.AI;
 //  - 잠긴 문: 쫓거나 조사하러 가는 가장 짧은 길이 잠긴 문을 지나면, 문 앞에서 손잡이를 돌려 보고 판단
 //    (배회 중에는 판단하지 않음). 우회로가 없고 무기가 있으면 파괴(최후의 수단), 그 밖에는 확률로
 //    우회(창문·환풍구, 조용히) / 위장 후퇴(보란 듯이 떠났다가 몰래 우회하거나 돌아와 잠복) / 잠복(문 옆에서 조용히 대기)
+//  - 학습 (FatherMemory, 잡혀서 씬이 재시작돼도 유지): 추격·문 앞에서 포기하면 그때 쓴 문·숨는 곳·도망 경로를 기록.
+//    같은 수법이 learnThreshold번 이상이면 막는 쪽 우선: 그 문 앞에선 우회·잠복↑, 그 숨는 곳은 먼저 뒤짐,
+//    그 방에서 놓치면 늘 도망치던 다음 방 길목으로. 배회할 때도 그쪽을 더 자주 들르고 숨는 곳을 가끔 열어 봄
 [RequireComponent(typeof(ChaserMotor), typeof(ChaserSenses))]
 public class FatherAI : MonoBehaviour, IChaserBrain
 {
@@ -96,6 +99,16 @@ public class FatherAI : MonoBehaviour, IChaserBrain
     public float bashInterval = 1.2f;
     public float bashGiveUpTime = 20f;
 
+    [Header("학습 (자주 쓰는 수법 차단)")]
+    [Tooltip("같은 수법(문·숨는 곳·도망 경로)으로 이만큼 빠져나가면 그걸 막는 쪽을 우선")]
+    public int learnThreshold = 2;
+    [Tooltip("자주 버틴 문 앞: 1회마다 우회·잠복 가중치 +이 비율 (최대 3배). 위장 후퇴는 그대로")]
+    public float doorLearnBoost = 0.5f;
+    [Tooltip("배회할 방 가중치: 자주 버틴 문 너머 방, 자주 숨은 곳이 있는 방은 1회마다 +이만큼")]
+    public float prowlLearnWeight = 1f;
+    [Tooltip("배회 중 자주 숨은 곳이 있는 방에 오면 그곳을 열어 볼 확률")]
+    [Range(0f, 1f)] public float checkLearnedSpotChance = 0.35f;
+
     [Header("점검·디버그")]
     [Tooltip("0이 아니면 이 값으로 무작위 판단을 고정 (점검용)")]
     public int randomSeed;
@@ -116,6 +129,7 @@ public class FatherAI : MonoBehaviour, IChaserBrain
     public DoorTactic LastDoorTactic { get; private set; }
     public bool LastDetourAvailable { get; private set; }
     public bool IsSneaking => motor != null && motor.quiet;
+    public bool PredictionLearned { get; private set; }   // 예측이 학습한 도망 경로에서 나왔는가
     public Vector3 Destination => destination;   // 디버그 표시용
     public Vector3 AmbushPoint => ambushPoint;
 
@@ -126,7 +140,9 @@ public class FatherAI : MonoBehaviour, IChaserBrain
         Mode.Investigate => "조사",
         Mode.Chase => "추격",
         Mode.Pursue => IsHesitating ? "놓침 (두리번)" : "마지막 위치로",
-        Mode.Intercept => $"앞질러 감 ({CameraTrigger.FindAt(PredictedPoint)?.roomName})",
+        Mode.Intercept => PredictionLearned
+            ? $"길목 차단 ({CameraTrigger.FindAt(PredictedPoint)?.roomName}, 학습한 도망 경로)"
+            : $"앞질러 감 ({CameraTrigger.FindAt(PredictedPoint)?.roomName})",
         Mode.SearchSpots => currentSpot != null ? $"숨는 곳 수색 ({currentSpot.displayName}, 남은 {spotQueue.Count})" : "숨는 곳 수색",
         Mode.Search => "주변 수색",
         Mode.DoorApproach => $"잠긴 문 확인 ({DoorTarget?.displayName})",
@@ -173,6 +189,12 @@ public class FatherAI : MonoBehaviour, IChaserBrain
     private float nextBash;
     private readonly Dictionary<EntryPoint, float> doorIgnoredUntil = new Dictionary<EntryPoint, float>();
 
+    // 학습: 이번 추격에서 일어난 일 (포기하면 '빠져나간 방법'으로 기록)
+    private readonly HashSet<EntryPoint> episodeDoors = new HashSet<EntryPoint>();
+    private readonly Dictionary<CharacterStatus, CameraTrigger> episodeRooms = new Dictionary<CharacterStatus, CameraTrigger>();
+    private readonly List<(CameraTrigger from, CameraTrigger to)> episodeMoves = new List<(CameraTrigger, CameraTrigger)>();
+    private float nextEpisodeTrack;
+
     void Awake()
     {
         motor = GetComponent<ChaserMotor>();
@@ -213,8 +235,42 @@ public class FatherAI : MonoBehaviour, IChaserBrain
         investigateSpot = null;
         DoorTarget = null;
         doorIgnoredUntil.Clear();
+        ClearEpisode();
         if (Game != null) Game.EndChase(this);
         BeginProwl();
+    }
+
+    // 점검·연출용: 이 지점 근처 숨는 곳 수색을 시작 (학습한 곳 우선)
+    public void SearchSpotsAround(Vector3 center)
+    {
+        HasPrediction = false;
+        BeginSpotSearch(center, null);
+    }
+
+    // 잠긴 문 앞 판단 가중치 (학습 반영: 자주 버틴 문이면 우회·잠복을 더 고름)
+    public FatherTactics.DoorWeights WeightsFor(EntryPoint door)
+    {
+        int escapes = FatherMemory.DoorEscapes(door);
+        float boost = escapes >= learnThreshold ? Mathf.Min(3f, 1f + doorLearnBoost * escapes) : 1f;
+        return new FatherTactics.DoorWeights { detour = detourWeight * boost, feign = feignWeight, ambush = ambushWeight * boost };
+    }
+
+    // 배회할 방 가중치 (자주 보인 방, 학습: 자주 버틴 문 너머 방·자주 숨은 곳이 있는 방)
+    public float ProwlWeight(CameraTrigger room, CameraTrigger here)
+    {
+        float weight = 1f + FatherMemory.Sightings(room) * sightingWeight;
+        foreach (EntryPoint entry in EntryPoint.All)
+        {
+            int escapes = FatherMemory.DoorEscapes(entry);
+            if (escapes >= learnThreshold && (entry.RoomA == room || entry.RoomB == room)) weight += escapes * prowlLearnWeight;
+        }
+        foreach (HidingSpot spot in HidingSpot.All)
+        {
+            int escapes = FatherMemory.HideEscapes(spot);
+            if (escapes >= learnThreshold && room.ContainsPoint(spot.transform.position)) weight += escapes * prowlLearnWeight;
+        }
+        if (here != null && room.buildingId != here.buildingId) weight *= 0.25f;
+        return weight;
     }
 
     // 연출·점검용: 배회 상태로 제자리에 서서 지켜봄 (seconds 동안 다른 방으로 가지 않음, 보거나 들으면 평소처럼 반응)
@@ -315,7 +371,43 @@ public class FatherAI : MonoBehaviour, IChaserBrain
     void StartChase(CharacterStatus who)
     {
         if (Game != null) Game.BeginChase(this, ChaseTargeting.FromSighting(who));
+        ClearEpisode();
         ResumeChase(who);
+    }
+
+    // ---------------- 학습 ----------------
+
+    void ClearEpisode()
+    {
+        episodeDoors.Clear();
+        episodeRooms.Clear();
+        episodeMoves.Clear();
+    }
+
+    // 추격 중 대상이 지나간 방 순서를 기록 (빠져나가면 '도망 경로'로 학습)
+    void TrackEpisode()
+    {
+        if (Game == null || !Chasing || Time.time < nextEpisodeTrack) return;
+        nextEpisodeTrack = Time.time + 0.2f;
+        foreach (CharacterStatus target in Game.TargetsOf(this))
+        {
+            if (target == null) continue;
+            CameraTrigger room = target.CurrentRoom;
+            if (room == null) continue;
+            if (episodeRooms.TryGetValue(target, out CameraTrigger previous) && previous != room) episodeMoves.Add((previous, room));
+            episodeRooms[target] = room;
+        }
+    }
+
+    // 추격을 포기함 = 플레이어가 빠져나감: 이번 추격에서 쓴 문·숨는 곳·도망 경로를 기록
+    void LearnFromEscape()
+    {
+        foreach (EntryPoint door in episodeDoors) FatherMemory.RecordDoorEscape(door);
+        if (Game != null)
+            foreach (CharacterStatus target in Game.TargetsOf(this))
+                if (target != null && target.IsHidden && !target.IsCaught) FatherMemory.RecordHideEscape(target.HidingIn);
+        foreach (var (from, to) in episodeMoves) FatherMemory.RecordRouteEscape(from, to);
+        ClearEpisode();
     }
 
     void ResumeChase(CharacterStatus who)
@@ -354,6 +446,7 @@ public class FatherAI : MonoBehaviour, IChaserBrain
         HasPrediction = false;
         currentSpot = null;
         spotQueue.Clear();
+        LearnFromEscape();
         if (Game != null) Game.EndChase(this);
         foreach (CharacterStatus character in CharacterStatus.All) senses.Forget(character);
         BeginProwl();
@@ -372,7 +465,8 @@ public class FatherAI : MonoBehaviour, IChaserBrain
     // 마지막으로 본 곳에 도착: 움직이던 방향으로 앞질러 가거나, 바로 숨는 곳 수색
     void AfterPursue()
     {
-        HasPrediction = TryPredict(out Vector3 predicted);
+        PredictionLearned = TryPredictLearned(out Vector3 predicted);
+        HasPrediction = PredictionLearned || TryPredict(out predicted);
         if (HasPrediction)
         {
             PredictedPoint = predicted;
@@ -381,6 +475,21 @@ public class FatherAI : MonoBehaviour, IChaserBrain
             return;
         }
         BeginSpotSearch(lastSeenPosition, null);
+    }
+
+    // 학습: 이 방에서 자주 도망친 다음 방이 있으면 그 길목(두 방을 잇는 문의 다음 방 쪽)으로 먼저 감
+    bool TryPredictLearned(out Vector3 predicted)
+    {
+        predicted = lastSeenPosition;
+        CameraTrigger from = CameraTrigger.FindAt(lastSeenPosition);
+        CameraTrigger next = FatherMemory.MostLikelyNext(from, out int count);
+        if (next == null || count < learnThreshold) return false;
+        EntryPoint between = null;
+        foreach (EntryPoint entry in EntryPoint.All)
+            if (entry.kind == EntryKind.Door && ((entry.RoomA == from && entry.RoomB == next) || (entry.RoomA == next && entry.RoomB == from))) { between = entry; break; }
+        if (between != null) predicted = between.RoomA == next ? between.PointA : between.PointB;
+        else predicted = RandomPointIn(next, lastSeenPosition);
+        return NavMesh.SamplePosition(predicted, out NavMeshHit onMesh, 1.5f, motor.Agent.areaMask) && Reachable(onMesh.position);
     }
 
     bool TryPredict(out Vector3 predicted)
@@ -405,15 +514,27 @@ public class FatherAI : MonoBehaviour, IChaserBrain
         if (Target != null && Target.IsHidden && Target.HidingIn.WasSeenEnteringBy(gameObject) && !spotQueue.Contains(Target.HidingIn))
             spotQueue.Add(Target.HidingIn);
 
+        // 학습: 자주 숨어서 넘긴 곳은 조금 더 멀어도(1.5배) 먼저 뒤짐 (뒤질 개수에 포함)
         var candidates = new List<HidingSpot>();
+        var learnedSpots = new List<HidingSpot>();
         foreach (HidingSpot spot in HidingSpot.All)
         {
             if (spotQueue.Contains(spot)) continue;
-            bool near = FlatDistance(spot.transform.position, center) <= spotSearchRadius
-                     || (HasPrediction && FlatDistance(spot.transform.position, PredictedPoint) <= spotSearchRadius);
-            if (near && Reachable(spot.transform.position)) candidates.Add(spot);
+            float distance = Mathf.Min(FlatDistance(spot.transform.position, center),
+                HasPrediction ? FlatDistance(spot.transform.position, PredictedPoint) : float.MaxValue);
+            bool learned = FatherMemory.HideEscapes(spot) >= learnThreshold;
+            if (distance > (learned ? spotSearchRadius * 1.5f : spotSearchRadius) || !Reachable(spot.transform.position)) continue;
+            (learned ? learnedSpots : candidates).Add(spot);
         }
-        for (int i = 0; i < maxSpotsToSearch && candidates.Count > 0; i++)
+        learnedSpots.Sort((a, b) => FatherMemory.HideEscapes(b).CompareTo(FatherMemory.HideEscapes(a)));
+        int picks = 0;
+        foreach (HidingSpot spot in learnedSpots)
+        {
+            if (picks >= maxSpotsToSearch) break;
+            spotQueue.Add(spot);
+            picks++;
+        }
+        for (; picks < maxSpotsToSearch && candidates.Count > 0; picks++)
         {
             HidingSpot pick = candidates[rng.Next(candidates.Count)];
             candidates.Remove(pick);
@@ -459,6 +580,7 @@ public class FatherAI : MonoBehaviour, IChaserBrain
     {
         if (Game != null && Game.RestartPending) { motor.Stop(); return; }
         if (motor.IsTraversing) return;
+        TrackEpisode();
         if (CheckDoorOnRoute()) return;
 
         switch (Current)
@@ -489,9 +611,30 @@ public class FatherAI : MonoBehaviour, IChaserBrain
             return;
         }
         LookAround();
-        if (pauseUntil <= 0f) { pauseUntil = Time.time + prowlPause; return; }
+        if (pauseUntil <= 0f)
+        {
+            pauseUntil = Time.time + prowlPause;
+            // 학습: 자주 숨어서 넘긴 곳이 이 방에 있으면 가끔 열어 봄
+            HidingSpot learned = LearnedSpotHere();
+            if (learned != null && rng.NextDouble() < checkLearnedSpotChance) Investigate(learned.transform.position, learned);
+            return;
+        }
         if (Time.time < pauseUntil) return;
         BeginProwl();
+    }
+
+    HidingSpot LearnedSpotHere()
+    {
+        CameraTrigger here = CameraTrigger.FindAt(transform.position);
+        if (here == null) return null;
+        HidingSpot best = null;
+        int most = learnThreshold - 1;
+        foreach (HidingSpot spot in HidingSpot.All)
+        {
+            int escapes = FatherMemory.HideEscapes(spot);
+            if (escapes > most && here.ContainsPoint(spot.transform.position)) { most = escapes; best = spot; }
+        }
+        return best;
     }
 
     void UpdateInvestigate()
@@ -638,8 +781,7 @@ public class FatherAI : MonoBehaviour, IChaserBrain
         foreach (CameraTrigger room in CameraTrigger.All)
         {
             if (room == here) continue;
-            float weight = 1f + FatherMemory.Sightings(room) * sightingWeight;
-            if (here != null && room.buildingId != here.buildingId) weight *= 0.25f;
+            float weight = ProwlWeight(room, here);
             rooms.Add(room);
             weights.Add(weight);
             total += weight;
@@ -762,12 +904,15 @@ public class FatherAI : MonoBehaviour, IChaserBrain
             hasWeapon = hasWeapon,
             breakable = DoorTarget.door.Breakable,
         };
-        var weights = new FatherTactics.DoorWeights { detour = detourWeight, feign = feignWeight, ambush = ambushWeight };
+        var weights = WeightsFor(DoorTarget);
+        if (Chasing) episodeDoors.Add(DoorTarget);
         DoorTactic tactic = forceDoorTactic != DoorTactic.None ? forceDoorTactic : FatherTactics.Choose(situation, weights, rng);
         if ((tactic == DoorTactic.Detour && !LastDetourAvailable) || (tactic == DoorTactic.Bash && !(hasWeapon && situation.breakable)))
             tactic = DoorTactic.Ambush;
         LastDoorTactic = tactic;
-        Debug.Log($"[아버지] {DoorTarget.displayName} 잠김 → {tactic} (우회로 {(LastDetourAvailable ? $"있음 +{doorDetourExtra:0}m" : "없음")}, 무기 {(hasWeapon ? "있음" : "없음")})");
+        int learned = FatherMemory.DoorEscapes(DoorTarget);
+        Debug.Log($"[아버지] {DoorTarget.displayName} 잠김 → {tactic} (우회로 {(LastDetourAvailable ? $"있음 +{doorDetourExtra:0}m" : "없음")}, 무기 {(hasWeapon ? "있음" : "없음")}" +
+                  $"{(learned >= learnThreshold ? $", 학습: 이 문으로 {learned}회 버팀 → 우회·잠복 우선" : "")})");
 
         switch (tactic)
         {
@@ -912,11 +1057,16 @@ public class FatherAI : MonoBehaviour, IChaserBrain
 
     void GiveUpDoor()
     {
-        IgnoreDoor(DoorTarget);
+        EntryPoint door = DoorTarget;
+        IgnoreDoor(door);
         DoorTarget = null;
         doorSpot = null;
-        if (Chasing) GiveUp();
-        else BeginProwl();
+        if (Chasing) GiveUp(); // 이번 추격에서 막혔던 문은 GiveUp에서 학습
+        else
+        {
+            FatherMemory.RecordDoorEscape(door); // 소리를 쫓아왔다가 문 앞에서 포기
+            BeginProwl();
+        }
     }
 
     // 문의 내 쪽 앞 지점

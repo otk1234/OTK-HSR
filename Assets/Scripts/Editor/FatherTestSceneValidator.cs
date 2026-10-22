@@ -202,6 +202,7 @@ public static class FatherTestSceneValidator
 
         // ---- 시작 상태 ----
         Check(GameStateManager.State == GameState.Investigation, "시작은 추리 상태");
+        Check(FatherMemory.TotalEscapes == 0, "새로 플레이를 시작하면 학습 기록은 비어 있음");
         Check(p1.CurrentRoom?.roomName == "서재" && p2.CurrentRoom?.roomName == "주방", "두 캐릭터는 떨어진 방(서재·주방)에서 시작");
         Check(motor.chaserType == ChaserType.Father && motor.Agent.areaMask == fatherMask, "아버지는 창문·환풍구를 쓸 수 있는 길찾기");
         Check(defaultChance > 0f && defaultChance <= 0.25f && defaultCooldown >= 30f && father.intuitionStartDelay >= 15f,
@@ -277,7 +278,9 @@ public static class FatherTestSceneValidator
         move1.scriptedInput = null;
         move1.scriptedRun = false;
         float lastSeenX = p1.transform.position.x;
-        Place(p1, new Vector3(-2f, 0f, 5f));               // 갑자기 시야에서 사라짐 (잠긴 안방 안)
+        HidingSpot masterCloset = Spot("안방 옷장");
+        Place(p1, masterCloset.transform.position);        // 갑자기 시야에서 사라져 잠긴 안방 옷장에 숨음 (학습 점검용)
+        masterCloset.TryEnter(p1);
         yield return 0.15f;
         Vector3 lostAt = father.transform.position;
         Check(father.IsHesitating, $"놓친 직후에는 제자리에서 두리번거림 (상태 {father.StateLabel})");
@@ -306,6 +309,94 @@ public static class FatherTestSceneValidator
         yield return game.chaseEndDelay + 0.3f;
         Check(!GameStateManager.IsChase && !p1.IsCaught, "포기하면 추리 상태로");
         Freeze();
+        Check(FatherMemory.HideEscapes(masterCloset) == 1 && FatherMemory.RouteEscapes(Room("동쪽 복도"), Room("안방")) == 1,
+            "학습 기록: 포기한 순간 숨어 있던 곳(안방 옷장)과 도망 경로(동쪽 복도 → 안방)를 기억");
+        masterCloset.Exit(p1);
+        yield return masterCloset.exitTime + 0.2f;
+
+        // ==== 3-3 학습 ====
+        // 문 앞에서 포기 (실제 흐름: 잠복하다 시간이 다 됨) → 그 문을 기억
+        EntryPoint learnDoor = Entry("아이방 문");
+        foreach (float s in SetLock(learnDoor, true)) yield return s;
+        float ambushDefault = father.ambushTime;
+        father.ambushTime = 2f;
+        father.forceDoorTactic = DoorTactic.Ambush;
+        Place(father, new Vector3(-11f, 0f, -1.5f), 0f);
+        ForgetAll();
+        father.enabled = true;
+        father.StandStill(1f);
+        yield return 0.1f;
+        NoiseSystem.Emit(new Vector3(-10f, 0f, 5f), 20f, NoiseKind.Run, p1.gameObject);
+        for (waited = 0f; waited < 25f && FatherMemory.DoorEscapes(learnDoor) == 0; waited += 0.2f) yield return 0.2f;
+        Check(FatherMemory.DoorEscapes(learnDoor) == 1 && father.Current == FatherAI.Mode.Prowl,
+            $"잠복하다 포기하면 '아이방 문으로 버팀'을 기억 ({waited:0.0}초, 상태 {father.StateLabel})");
+        father.ambushTime = ambushDefault;
+        father.forceDoorTactic = DoorTactic.None;
+        Freeze();
+
+        // 기준 횟수(2) 이상이면: 그 문 앞에서 우회·잠복을 더 고르고, 배회할 때 그 문 너머 방을 더 자주 들름
+        FatherTactics.DoorWeights weightsBefore = father.WeightsFor(learnDoor);
+        float prowlBefore = father.ProwlWeight(Room("아이방"), Room("중앙 홀"));
+        Check(father.learnThreshold == 2, $"학습 기준: 같은 수법 {father.learnThreshold}회");
+        FatherMemory.RecordDoorEscape(learnDoor);            // 2회째
+        FatherTactics.DoorWeights weightsAfter = father.WeightsFor(learnDoor);
+        var learnRng = new System.Random(5);
+        float FeignShare(FatherTactics.DoorWeights w)
+        {
+            int feign = 0;
+            var situation = new FatherTactics.DoorSituation { detourAvailable = true, detourExtra = 5f, breakable = true };
+            for (int i = 0; i < 4000; i++) if (FatherTactics.Choose(situation, w, learnRng) == DoorTactic.FeignRetreat) feign++;
+            return feign / 4000f;
+        }
+        float feignBefore = FeignShare(weightsBefore), feignAfter = FeignShare(weightsAfter);
+        Check(weightsAfter.detour > weightsBefore.detour && weightsAfter.ambush > weightsBefore.ambush && weightsAfter.feign == weightsBefore.feign && feignAfter < feignBefore - 0.05f,
+            $"2회 버틴 문 앞: 우회·잠복 가중치 ×{weightsAfter.detour / weightsBefore.detour:0.0} (위장 후퇴 {feignBefore:P0} → {feignAfter:P0}, 막는 판단 {1f - feignBefore:P0} → {1f - feignAfter:P0})");
+        Check(father.ProwlWeight(Room("아이방"), Room("중앙 홀")) > prowlBefore,
+            $"배회: 그 문 너머 방(아이방)을 더 자주 들름 (가중치 {prowlBefore:0.0} → {father.ProwlWeight(Room("아이방"), Room("중앙 홀")):0.0})");
+        foreach (float s in SetLock(learnDoor, false)) yield return s;
+
+        // 숨는 곳: 2회 이상 숨어서 넘긴 곳은 평소 후보 반경(6m) 밖이어도(1.5배까지) 먼저 뒤짐
+        HidingSpot learnSpot = Spot("장난감 상자");
+        Vector3 westCenter = new Vector3(-8f, 0f, 0f);
+        float spotDistance = Flat(learnSpot.transform.position, westCenter);
+        FatherMemory.RecordHideEscape(learnSpot);
+        FatherMemory.RecordHideEscape(learnSpot);
+        Place(father, westCenter, 0f);
+        father.enabled = true;
+        father.StandStill(5f);
+        father.SearchSpotsAround(westCenter);
+        Check(father.Current == FatherAI.Mode.SearchSpots && father.SpotBeingChecked == learnSpot && spotDistance > father.spotSearchRadius,
+            $"자주 숨은 곳(장난감 상자, {spotDistance:0.0}m 떨어짐)을 가장 먼저 뒤지러 감 (평소 반경 {father.spotSearchRadius:0}m 밖)");
+        Freeze();
+
+        // 배회 중 자주 숨은 곳이 있는 방에 오면 가끔 열어 봄 (점검은 확률 100%로)
+        float checkChance = father.checkLearnedSpotChance;
+        father.checkLearnedSpotChance = 1f;
+        Place(father, new Vector3(-8f, 0f, 5f), 0f);
+        father.enabled = true;
+        father.StandStill(0.2f);
+        for (waited = 0f; waited < 3f && father.Current != FatherAI.Mode.Investigate; waited += 0.1f) yield return 0.1f;
+        Check(father.Current == FatherAI.Mode.Investigate && father.InvestigateSpot == learnSpot,
+            $"배회하다 아이방에 오면 자주 숨은 장난감 상자를 열어 봄 (기본 확률 {checkChance:P0})");
+        father.checkLearnedSpotChance = checkChance;
+        Freeze();
+
+        // 도망 경로: 서쪽 복도에서 주방으로 2회 도망쳤다면, 서쪽 복도에서 놓쳤을 때 주방 길목으로 먼저 감
+        FatherMemory.RecordRouteEscape(Room("서쪽 복도"), Room("주방"));
+        FatherMemory.RecordRouteEscape(Room("서쪽 복도"), Room("주방"));
+        Place(father, new Vector3(-10f, 0f, 1.5f), 160f);
+        Place(p1, new Vector3(-9f, 0f, -1.5f));            // 서 있음 (움직이는 방향 없음 → 방향 예측은 불가)
+        ForgetAll();
+        father.enabled = true;
+        father.StandStill(5f);
+        for (waited = 0f; waited < 2f && father.Current != FatherAI.Mode.Chase; waited += 0.05f) yield return 0.05f;
+        Check(father.Current == FatherAI.Mode.Chase, "준비: 서쪽 복도에서 탐정 발견 → 추격");
+        Place(p1, new Vector3(-2f, 0f, 5f));               // 시야에서 사라짐 (잠긴 안방)
+        for (waited = 0f; waited < 6f && father.Current != FatherAI.Mode.Intercept; waited += 0.1f) yield return 0.1f;
+        Check(father.Current == FatherAI.Mode.Intercept && father.PredictionLearned && CameraTrigger.FindAt(father.PredictedPoint)?.roomName == "주방",
+            $"서쪽 복도에서 놓치자, 늘 도망치던 주방 길목으로 먼저 감 (상태 {father.StateLabel})");
+        Freeze();
+        yield return game.chaseEndDelay + 0.3f;
 
         // ==== 3-2 잠긴 문 판단 ====
         // 판단 확률 (계산만)
@@ -482,5 +573,14 @@ public static class FatherTestSceneValidator
         father.enabled = true;
         for (waited = 0f; waited < 25f && !p1.IsCaught; waited += 0.25f) yield return 0.25f;
         Check(p1.IsCaught && game.RestartPending, $"놓친 곳 근처 숨는 곳을 뒤져서 잡음 → 씬 재시작 예약 ({waited:0.0}초)");
+
+        // 잡혀서 씬이 다시 시작돼도 학습은 남음 (오브젝트는 새로 만들어지므로 이름으로 다시 찾음)
+        yield return game.restartDelay + 2f;
+        var reloadedFather = Object.FindAnyObjectByType<FatherAI>();
+        EntryPoint reloadedDoor = EntryPoint.All.FirstOrDefault(e => e.displayName == "아이방 문");
+        HidingSpot reloadedSpot = HidingSpot.All.FirstOrDefault(s => s.displayName == "장난감 상자");
+        Check(reloadedFather != null && reloadedFather != father && reloadedDoor != null
+              && FatherMemory.DoorEscapes(reloadedDoor) >= 2 && FatherMemory.HideEscapes(reloadedSpot) >= 2,
+            $"씬이 재시작돼도 학습 유지 (아이방 문 {FatherMemory.DoorEscapes(reloadedDoor)}회, 장난감 상자 {FatherMemory.HideEscapes(reloadedSpot)}회)");
     }
 }

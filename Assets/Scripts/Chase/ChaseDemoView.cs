@@ -107,6 +107,19 @@ public class ChaseDemoView : MonoBehaviour
             labels.Add((character.transform.position + Vector3.up * 1.3f, shortName + state, Color.white));
         }
 
+        // 학습한 것 (문·숨는 곳)
+        Color learnedColor = new Color(1f, 0.5f, 0.8f);
+        foreach (EntryPoint entry in EntryPoint.All)
+        {
+            int count = FatherMemory.DoorEscapes(entry);
+            if (count > 0) labels.Add(((entry.PointA + entry.PointB) * 0.5f + Vector3.up * 1.1f, $"학습: 문으로 버팀 {count}회", learnedColor));
+        }
+        foreach (HidingSpot learnedSpot in HidingSpot.All)
+        {
+            int count = FatherMemory.HideEscapes(learnedSpot);
+            if (count > 0) labels.Add((learnedSpot.transform.position + Vector3.up * 1.0f, $"학습: 숨어서 넘김 {count}회", learnedColor));
+        }
+
         bool active = father != null && father.enabled && father.gameObject.activeInHierarchy;
         pathLine.enabled = coneLine.enabled = doorRing.enabled = markRing.enabled = spotRing.enabled = false;
         if (!active) return;
@@ -130,7 +143,7 @@ public class ChaseDemoView : MonoBehaviour
         else if (father.HasPrediction && (father.Current == FatherAI.Mode.Intercept || father.Current == FatherAI.Mode.SearchSpots))
         {
             Ring(markRing, father.PredictedPoint, 0.6f, Color.magenta);
-            labels.Add((father.PredictedPoint + Vector3.up * 0.4f, "예측 지점", Color.magenta));
+            labels.Add((father.PredictedPoint + Vector3.up * 0.4f, father.PredictionLearned ? "길목 (학습한 도망 경로)" : "예측 지점", Color.magenta));
         }
         else if (father.Current == FatherAI.Mode.FeignRetreat)
         {

@@ -8,7 +8,7 @@ using UnityEngine;
 using UnityEngine.AI;
 using Object = UnityEngine.Object;
 
-// 아버지 AI 시연 (3-1·3-2단계): 메뉴 OTK → 아버지 AI 시연
+// 아버지 AI 시연 (3-1·3-2·3-3단계): 메뉴 OTK → 아버지 AI 시연
 // 플레이 모드에서 자막과 함께 순서대로 보여 주고, 끝나면 직접 조작할 수 있습니다.
 // 명령줄 녹화: -executeMethod FatherDemo.RecordFromCommandLine -demoFramesDir <폴더>
 //  → 집 전체를 일정 간격으로 찍은 JPG와 자막 목록(frames.txt)을 남기고 에디터를 닫습니다.
@@ -186,6 +186,7 @@ public static class FatherDemo
         var senses = father.GetComponent<ChaserSenses>();
         EntryPoint Entry(string name) => EntryPoint.All.First(e => e.displayName == name);
         HidingSpot Spot(string name) => HidingSpot.All.First(s => s.displayName == name);
+        CameraTrigger Room(string name) => CameraTrigger.All.First(r => r.roomName == name);
         float Flat(Vector3 a, Vector3 b) => new Vector2(a.x - b.x, a.z - b.z).magnitude;
         string RoomOf(Component c) => CameraTrigger.FindAt(c.transform.position)?.roomName ?? "";
 
@@ -247,7 +248,7 @@ public static class FatherDemo
         father.searchTime = 4f;
         father.Reseed(7);
         Place(father, new Vector3(0f, 0f, -1.5f), 180f);
-        Say("아버지 AI 시연 (3-1·3-2단계)\n창문·환풍구를 쓰고, 놓치면 예측해서 앞지르고, 숨는 곳을 뒤지는 고지능 추격자입니다.");
+        Say("아버지 AI 시연 (3-1·3-2·3-3단계)\n창문·환풍구를 쓰고, 놓치면 예측해서 앞지르고, 숨는 곳을 뒤지는 고지능 추격자입니다.");
         yield return 4f;
 
         // ① 맵: 잠긴 문 너머로 가는 길
@@ -397,7 +398,61 @@ public static class FatherDemo
         Freeze();
         yield return game.chaseEndDelay + 0.5f;
 
-        // ⑦ 피날레: 숨는 장면을 못 봤어도 놓친 곳 근처를 뒤져 잡음
+        // ⑦ 학습 (3-3단계): 플레이어가 빠져나간 방법을 기억했다가 그걸 막는 쪽을 우선
+        //    실제로는 아버지가 추격·문 앞에서 포기할 때마다 쌓임. 시연에서는 기록을 미리 넣고 효과를 보여 줌
+        Say("⑦ 학습 (3-3단계): 아버지는 추격을 포기할 때마다, 플레이어가 어떻게 빠져나갔는지(잠근 문·숨은 곳·도망친 경로)를 기억합니다.\n같은 수법을 2번 쓰면 그걸 막는 쪽을 먼저 고릅니다. 잡혀서 재시작돼도 기억은 남습니다.");
+        yield return 6f;
+
+        // ⑦-a 문
+        foreach (float s in SetLock(kidDoor, true)) yield return s;
+        FatherMemory.RecordDoorEscape(kidDoor);
+        FatherMemory.RecordDoorEscape(kidDoor);
+        Say("⑦-a (시연을 위해 기록을 미리 넣음) '아이방 문을 잠그고 버텨서 2번 빠져나감'.\n이제 이 문 앞에서는 위장 후퇴보다 우회·잠복을 더 자주 고르고(막는 판단 76% → 86%), 배회할 때 아이방을 더 자주 들릅니다.");
+        yield return 5f;
+        foreach (float s in SoundInKidRoom(DoorTactic.None)) yield return s;
+        foreach (float s in Watch("⑦-a 다시 아이방에서 소리 → 학습한 문 앞에서의 판단 (분홍 글자 = 학습한 것)", 12f,
+                     () => father.Current == FatherAI.Mode.Detour || father.Current == FatherAI.Mode.Ambush || father.Current == FatherAI.Mode.FeignRetreat)) yield return s;
+        foreach (float s in Watch("⑦-a 판단 결과", 4f)) yield return s;
+        Freeze();
+        foreach (float s in SetLock(kidDoor, false)) yield return s;
+
+        // ⑦-b 숨는 곳
+        HidingSpot toyBoxLearned = Spot("장난감 상자");
+        FatherMemory.RecordHideEscape(toyBoxLearned);
+        FatherMemory.RecordHideEscape(toyBoxLearned);
+        Vector3 westCenter = new Vector3(-8f, 0f, 0f);
+        Place(father, westCenter, 0f);
+        father.enabled = true;
+        father.StandStill(10f);
+        Say("⑦-b (기록을 미리 넣음) '장난감 상자에 숨어서 2번 넘김'.\n서쪽 복도에서 수색을 시작하면, 평소 후보 반경(6m) 밖인 장난감 상자(약 8m)도 가장 먼저 뒤집니다.");
+        yield return 4f;
+        father.SearchSpotsAround(westCenter);
+        foreach (float s in Watch("⑦-b 자주 숨은 곳부터 확인 (초록 원)", 15f,
+                     () => Flat(father.transform.position, toyBoxLearned.transform.position) < 1.5f)) yield return s;
+        foreach (float s in Watch("⑦-b 장난감 상자를 열어 봄. (배회하다 아이방에 들러도 35% 확률로 열어 봄)", 3f)) yield return s;
+        Freeze();
+
+        // ⑦-c 도망 경로
+        FatherMemory.RecordRouteEscape(Room("서쪽 복도"), Room("주방"));
+        FatherMemory.RecordRouteEscape(Room("서쪽 복도"), Room("주방"));
+        Place(father, new Vector3(-10f, 0f, 1.5f), 160f);
+        Place(p1, new Vector3(-9f, 0f, -1.5f));
+        ForgetAll();
+        Say("⑦-c (기록을 미리 넣음) '서쪽 복도에서 주방으로 도망쳐 2번 따돌림'.\n서쪽 복도에서 탐정을 발견했다가 놓치면…");
+        yield return 4f;
+        ForgetAll();
+        father.enabled = true;
+        father.StandStill(5f);
+        for (float t = 0f; t < 3f && father.Current != FatherAI.Mode.Chase; t += 0.05f) yield return 0.05f;
+        yield return 0.4f;
+        Place(p1, new Vector3(6f, 0f, 4.5f));   // 시야에서 사라짐 (시연용 순간이동, 서재)
+        foreach (float s in Watch("⑦-c 탐정이 사라짐 → 두리번 → 늘 도망치던 주방 쪽 길목(주방 문 안쪽)으로 먼저 갑니다.", 12f,
+                     () => father.Current == FatherAI.Mode.Intercept && motor.Arrived(0.6f))) yield return s;
+        foreach (float s in Watch("⑦-c 길목에서 기다리며 확인", 3f)) yield return s;
+        Freeze();
+        yield return game.chaseEndDelay + 0.5f;
+
+        // ⑧ 피날레: 숨는 장면을 못 봤어도 놓친 곳 근처를 뒤져 잡음
         HidingSpot pantry = Spot("팬트리");
         foreach (float s in SetLock(Entry("주방 문"), false)) yield return s;
         if (!Entry("주방 문").door.IsOpen) Entry("주방 문").door.Interact(inventory);   // 열어 둠 (아버지가 이미 열어 뒀으면 그대로)
@@ -405,25 +460,25 @@ public static class FatherDemo
         Place(p1, new Vector3(-8f, 0f, -5.5f));
         Place(father, new Vector3(-8f, 0f, -0.5f), 180f);
         ForgetAll();
-        Say("⑦ 마지막: 열린 주방 문 너머로 탐정이 보입니다.");
+        Say("⑧ 마지막: 열린 주방 문 너머로 탐정이 보입니다.");
         yield return 1.5f;
         ForgetAll();   // 자막을 보여 주는 동안 눈(감각)은 켜져 있었으므로 새로 시작
         father.enabled = true;
         father.StandStill(5f);
         for (float t = 0f; t < 3f && father.Current != FatherAI.Mode.Chase; t += 0.05f) yield return 0.05f;
-        Say("⑦ 발견 → 추격!");
+        Say("⑧ 발견 → 추격!");
         yield return 0.3f;
         father.enabled = false;
         motor.Stop();
         Place(father, new Vector3(-11f, 0f, 1.5f), 0f);
         Place(p1, pantry.transform.position);
         pantry.TryEnter(p1);
-        Say("⑦ 탐정은 아버지가 못 보는 사이에 팬트리에 숨었습니다. (경찰이었다면 숨는 장면을 못 봤으니 지나쳤을 상황)");
+        Say("⑧ 탐정은 아버지가 못 보는 사이에 팬트리에 숨었습니다. (경찰이었다면 숨는 장면을 못 봤으니 지나쳤을 상황)");
         yield return 3f;
         father.enabled = true;
-        foreach (float s in Watch("⑦ 아버지는 놓친 곳 근처의 숨는 곳을 뒤집니다…", 25f, () => p1.IsCaught)) yield return s;
+        foreach (float s in Watch("⑧ 아버지는 놓친 곳 근처의 숨는 곳을 뒤집니다…", 25f, () => p1.IsCaught)) yield return s;
 
-        Say("⑧ 팬트리를 열어 잡음 → 씬 재시작.\n시연 끝! 다음 단계(3-3)에서 학습(자주 쓰는 수법 차단)을 넣습니다.\n이제 직접 조작해 보세요: WASD · Shift · E · F · Tab");
+        Say("⑨ 팬트리를 열어 잡음 → 씬 재시작.\n시연 끝! 학습한 기록은 잡혀서 재시작돼도 남습니다.\n이제 직접 조작해 보세요: WASD · Shift · E · F · Tab");
         yield return recording ? 5f : 12f;
         ChaseDebugOverlay.Caption = "";
         caption = "";
