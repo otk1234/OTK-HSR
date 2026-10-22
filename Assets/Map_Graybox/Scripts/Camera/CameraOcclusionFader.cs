@@ -43,13 +43,16 @@ namespace NarrativeGraybox.CameraSystem
         private void TraceTo(Vector3 point)
         {
             Camera camera = GetComponent<Camera>();
-            Vector3 screen = camera.WorldToViewportPoint(point);
-            if (screen.z <= 0) return;
-            Ray ray = camera.ViewportPointToRay(screen);
-            float distance = Vector3.Dot(point - ray.origin, ray.direction);
-            foreach (RaycastHit hit in Physics.RaycastAll(ray, Mathf.Max(0, distance - .08f),
-                         obstructionLayers, QueryTriggerInteraction.Ignore))
-                Hide(hit.collider.GetComponent<OccludingWall>());
+            Vector3 origin = camera.transform.position;
+            Vector3 toPoint = point - origin;
+            float distance = toPoint.magnitude;
+            if (distance <= .08f) return;
+
+            // 얇은 벽의 모서리를 스치거나 카메라가 이동 중이어도 안정적으로 감지하도록
+            // 한 줄짜리 Raycast 대신 작은 반지름의 SphereCast를 사용합니다.
+            foreach (RaycastHit hit in Physics.SphereCastAll(origin, .22f, toPoint / distance,
+                         distance - .08f, obstructionLayers, QueryTriggerInteraction.Ignore))
+                Hide(hit.collider.GetComponentInParent<OccludingWall>());
         }
 
         private void Hide(OccludingWall wall)
