@@ -6,9 +6,11 @@
 /[Ll]ogs/
 /[Uu]ser[Ss]ettings/
 .vs/
+.vscode/
 *.csproj
 *.unityproj
 *.sln
+*.slnx
 *.suo
 *.tmp
 *.user
@@ -21,3 +23,4 @@
 *.opendb
 *.VC.db
 sysinfo.txt
+Gemini 요약본.txt

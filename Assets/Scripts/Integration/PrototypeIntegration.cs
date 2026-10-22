@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using Unity.Cinemachine;
 using NarrativeGraybox.CameraSystem;
@@ -43,6 +44,7 @@ public class PrototypeIntegration : MonoBehaviour
 
     [Header("소지품 칸 수 (HUD 표시와 같게)")]
     public int inventorySize = 5;
+    private bool useSiblingCharacterRules;
 
     [Header("진행 목표 (위에서부터 순서대로)")]
     public Objective[] objectives;
@@ -55,6 +57,10 @@ public class PrototypeIntegration : MonoBehaviour
     private bool completeShown;
     private GUIStyle labelStyle;
     private GUIStyle centeredStyle;
+    private bool overviewFollowEnabled;
+    private readonly Dictionary<GameObject, Vector3> overviewOffsets = new Dictionary<GameObject, Vector3>();
+    private readonly Dictionary<GameObject, Vector3> overviewVelocities = new Dictionary<GameObject, Vector3>();
+    private const float OverviewFollowSmoothTime = 0.22f;
 
     private GameObject[] Players => CharacterManager.instance.players;
 
@@ -154,6 +160,70 @@ public class PrototypeIntegration : MonoBehaviour
         hud.SetInteractionPrompt("");
     }
 
+    // 기획 참고용 복제 씬에서만 호출합니다. 조사 확대 카메라에는 영향을 주지 않습니다.
+    public void EnableOverviewCameraFollow()
+    {
+        overviewFollowEnabled = true;
+        overviewOffsets.Clear();
+        overviewVelocities.Clear();
+
+        if (rooms == null) rooms = FindObjectsByType<CameraTrigger>(FindObjectsSortMode.None);
+        GameObject active = CharacterManager.instance == null ? null : CharacterManager.instance.GetActivePlayer();
+        if (active == null) return;
+
+        foreach (CameraTrigger room in rooms)
+        {
+            if (room == null || room.virtualCamera == null) continue;
+            Transform cameraTransform = room.virtualCamera.transform;
+            Vector3 forward = cameraTransform.forward;
+            float distance = Mathf.Abs(forward.y) < .001f
+                ? 0f
+                : (active.transform.position.y - cameraTransform.position.y) / forward.y;
+            Vector3 viewCenter = cameraTransform.position + forward * distance;
+            overviewOffsets[room.virtualCamera] = cameraTransform.position - viewCenter;
+            overviewVelocities[room.virtualCamera] = Vector3.zero;
+        }
+    }
+
+    void LateUpdate()
+    {
+        if (!overviewFollowEnabled || restoringCamera || wasInspecting || cameraBrain == null || !cameraBrain.enabled)
+            return;
+
+        GameObject active = CharacterManager.instance == null ? null : CharacterManager.instance.GetActivePlayer();
+        if (active == null) return;
+
+        foreach (CameraTrigger room in rooms)
+        {
+            GameObject virtualCamera = room == null ? null : room.virtualCamera;
+            if (virtualCamera == null || !virtualCamera.activeInHierarchy || !overviewOffsets.TryGetValue(virtualCamera, out Vector3 offset))
+                continue;
+
+            Vector3 velocity = overviewVelocities[virtualCamera];
+            virtualCamera.transform.position = Vector3.SmoothDamp(
+                virtualCamera.transform.position,
+                active.transform.position + offset,
+                ref velocity,
+                OverviewFollowSmoothTime);
+            overviewVelocities[virtualCamera] = velocity;
+        }
+    }
+
+    public bool OverviewFollowEnabled => overviewFollowEnabled;
+
+    // 기획 참고용 남매 규칙: 0번 여동생, 1번 오빠. 오빠는 기본보다 소지품을 한 칸 더 사용합니다.
+    // (칸 수는 임시 — 6.2 캐릭터 프로필로 옮길 예정)
+    public void EnableSiblingCharacterRules()
+    {
+        useSiblingCharacterRules = true;
+        characterNames = new[] { "여동생", "오빠" };
+    }
+
+    public int InventoryCapacityFor(int playerIndex)
+    {
+        return inventorySize + (useSiblingCharacterRules && playerIndex == 1 ? 1 : 0);
+    }
+
     void SyncHud(GameObject active)
     {
         int index = CharacterManager.instance.ActivePlayerIndex;
@@ -217,7 +287,8 @@ public class PrototypeIntegration : MonoBehaviour
     bool AddToActiveInventory(string itemName)
     {
         Inventory inventory = CharacterManager.instance.GetActivePlayer().GetComponent<Inventory>();
-        if (inventory.items.Count >= inventorySize) return false;
+        int capacity = InventoryCapacityFor(CharacterManager.instance.ActivePlayerIndex);
+        if (inventory.items.Count >= capacity) return false;
         inventory.AddItem(itemName);
         return true;
     }
