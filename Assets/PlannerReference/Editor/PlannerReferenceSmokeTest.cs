@@ -53,6 +53,14 @@ public static class PlannerReferenceSmokeTest
         Check(demo.GetHands(0)[0] == player1Hand && demo.GetHands(1)[0] == player2Hand && player1Hand != player2Hand, "equipment persists independently after character switch");
         demo.PerformDummySave();
         Check(demo.DummySaveCount == 1, "dummy save interaction");
+        var wall = UnityEngine.Object.FindFirstObjectByType<NarrativeGraybox.CameraSystem.OccludingWall>();
+        var rendererField = typeof(NarrativeGraybox.CameraSystem.OccludingWall).GetField("wallRenderer", BindingFlags.Instance | BindingFlags.NonPublic);
+        var wallRenderer = rendererField.GetValue(wall) as Renderer;
+        wall.SetOccluded(true); yield return .5f;
+        Material fadedMaterial = wallRenderer.sharedMaterials.First(material => material.HasProperty("_BaseColor") || material.HasProperty("_Color"));
+        float fadedAlpha = fadedMaterial.HasProperty("_BaseColor") ? fadedMaterial.GetColor("_BaseColor").a : fadedMaterial.color.a;
+        Check(wallRenderer.enabled && fadedAlpha < .2f, "occluding wall fades without disabling renderer");
+        wall.SetOccluded(false, true);
         Check(AssetDatabase.LoadAssetAtPath<SceneAsset>("Assets/Scenes/Prototype.unity") != null, "original prototype preserved");
         yield return .5f;
     }
