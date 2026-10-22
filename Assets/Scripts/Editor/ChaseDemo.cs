@@ -110,7 +110,7 @@ public static class ChaseDemo
         chaser.enabled = false;
         Place(chaser, new Vector3(1.5f, 0f, -1.5f), 0f);
         Place(p1, new Vector3(-9f, 0f, 1.6f));
-        Place(p2, new Vector3(-5f, 0f, 6.0f));          // 조수는 침실에서 대기
+        Place(p2, new Vector3(-5f, 0f, 6.0f));          // 오빠는 침실에서 대기
         Say("추격 시스템 시연을 시작합니다 (1단계 + 경찰 AI).\n(왼쪽 위: 게임 상태 · 캐릭터 상태 · 스태미나 · 위치 · 추격자 인지도)");
         yield return 4f;
 
@@ -159,7 +159,7 @@ public static class ChaseDemo
         Place(p1, curtainSpot.transform.position);
         yield return 0.3f;
         curtainSpot.TryEnter(p1);
-        Say("⑦ 탐정은 커튼 뒤에 숨어서 지켜봅니다. 조수는 욕실에 들어가 문을 잠갔습니다.");
+        Say("⑦ 여동생은 커튼 뒤에 숨어서 지켜봅니다. 오빠는 욕실에 들어가 문을 잠갔습니다.");
         Place(p2, new Vector3(-7.5f, 0f, -4.2f));
         bathDoor.door.ToggleLock(p2.GetComponent<Inventory>());
         yield return 2.5f;
@@ -189,7 +189,7 @@ public static class ChaseDemo
         Place(p2, closet.transform.position);
         manager.SwitchInstant(1);
         Place(chaser, new Vector3(0f, 0f, 5.2f), 270f);
-        Say("⑪ 조수로 전환. 침실 옷장에 숨습니다 (E). 숨는 동안 추격자가 보고 있으면 기억됩니다.");
+        Say("⑪ 오빠로 전환. 침실 옷장에 숨습니다 (E). 숨는 동안 추격자가 보고 있으면 기억됩니다.");
         yield return 1.5f;
         closet.TryEnter(p2);
         yield return 2f;
@@ -209,10 +209,10 @@ public static class ChaseDemo
         Say("⑬ 추격 상태 (이벤트로 시작 · 왼쪽 위 빨간 표시): 방 이동·Tab 전환 모두 페이드 없이 즉시 컷됩니다.");
         yield return 2.5f;
         manager.SwitchInstant(1);
-        Say("⑬ Tab → 조수 (침실, 즉시 컷)");
+        Say("⑬ Tab → 오빠 (침실, 즉시 컷)");
         yield return 1.8f;
         manager.SwitchInstant(0);
-        Say("⑬ Tab → 탐정 (거실, 즉시 컷)");
+        Say("⑬ Tab → 여동생 (거실, 즉시 컷)");
         yield return 1.8f;
         GameStateManager.instance.ForceChase(false);
         Say("⑬ 추격이 끝나면 잠시 뒤 추리 상태로 돌아갑니다.");
@@ -224,7 +224,7 @@ public static class ChaseDemo
         Place(p1, new Vector3(-6f, 0f, -1.6f));
         senses.Forget(p1);
         senses.Forget(p2);
-        Say("⑭ 이제 경찰 AI를 켭니다. 탐정이 거실에서 달리면… 추격자가 소리를 듣고 확인하러 옵니다.");
+        Say("⑭ 이제 경찰 AI를 켭니다. 여동생이 거실에서 달리면… 추격자가 소리를 듣고 확인하러 옵니다.");
         yield return 2.5f;
         chaser.enabled = true;
         police.ResetToPatrol();
@@ -237,7 +237,7 @@ public static class ChaseDemo
         move1.scriptedRun = false;
         for (float t = 0f; t < 8f && !GameStateManager.IsChase; t += 0.25f) yield return 0.25f;
 
-        Say("⑮ 발견 → 추격 상태! 탐정이 추격자가 보는 앞에서 커튼 뒤로 숨으면… 숨는 장면을 봤으므로 그곳을 뒤집니다.");
+        Say("⑮ 발견 → 추격 상태! 여동생이 추격자가 보는 앞에서 커튼 뒤로 숨으면… 숨는 장면을 봤으므로 그곳을 뒤집니다.");
         move1.scriptedRun = true;
         move1.scriptedInput = new Vector2(-1f, 0f);
         yield return 0.5f;

@@ -4,15 +4,20 @@ using UnityEngine;
 
 // 팀원 조사 항목(InspectionItem)에 붙이는 단서 표시. 팀원 코드는 고치지 않습니다.
 //  - 조사 화면에서 이 항목을 클릭해 살펴보면 사건 파일에 기록 (CrimeSceneDirector가 확인)
-//  - visibleTo: 특정 캐릭터에게만 보이는 숨겨진 단서 (예: 여동생만 찾는 단서). 다른 캐릭터에게는 모양·클릭 판정이 꺼짐
+//  - visibleToTrait: 그 특성이 있는 캐릭터에게만 보이는 숨겨진 단서 (예: 정보 수집 = 여동생). 다른 캐릭터에게는 모양·클릭 판정이 꺼짐
 [RequireComponent(typeof(InspectionItem))]
 public class Clue : MonoBehaviour
 {
     [Header("단서 ID (추리 데이터에서 이 ID로 찾음)")]
     public string clueId;
 
-    [Header("이 캐릭터에게만 보임 (All = 모두)")]
+    [Header("이 특성이 있는 캐릭터에게만 보임 (None = 모두)")]
+    public CharacterTrait visibleToTrait = CharacterTrait.None;
+
+    [Header("(예전 방식) 이 캐릭터에게만 보임 — 새로 만들 때는 특성을 쓸 것")]
     public CharacterType visibleTo = CharacterType.All;
+
+    bool Hidden => visibleTo != CharacterType.All || visibleToTrait != CharacterTrait.None;
 
     private InspectionItem item;
     private readonly List<Renderer> shapes = new List<Renderer>();
@@ -32,9 +37,9 @@ public class Clue : MonoBehaviour
 
     void LateUpdate()
     {
-        if (visibleTo == CharacterType.All || CharacterManager.instance == null) return;
+        if (!Hidden || CharacterManager.instance == null) return;
         GameObject active = CharacterManager.instance.GetActivePlayer();
-        bool show = active != null && active.GetComponent<PlayerInteraction>().myType == visibleTo;
+        bool show = active != null && IsVisibleTo(CharacterRoster.TypeOf(active));
         if (show == visible) return;
         visible = show;
         foreach (Renderer r in shapes) r.enabled = show;
@@ -42,5 +47,5 @@ public class Clue : MonoBehaviour
         if (!show) item.SetHover(false);
     }
 
-    public bool IsVisibleTo(CharacterType type) => visibleTo == CharacterType.All || visibleTo == type;
+    public bool IsVisibleTo(CharacterType type) => CharacterRoster.CanUse(type, visibleTo, visibleToTrait);
 }

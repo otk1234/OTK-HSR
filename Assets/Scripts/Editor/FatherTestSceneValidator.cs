@@ -263,7 +263,7 @@ public static class FatherTestSceneValidator
         foreach (float s in SetLock(Entry("아이방 문"), false)) yield return s;
 
         // ---- 추격 → 놓침 → 움직이던 방향을 예측해 앞질러 감 → 수색 → 포기 ----
-        Place(father, new Vector3(4.8f, 0f, -2f), 11f);    // 동쪽 복도 서쪽 끝, 탐정 쪽을 봄
+        Place(father, new Vector3(4.8f, 0f, -2f), 11f);    // 동쪽 복도 서쪽 끝, 여동생 쪽을 봄
         Place(p1, new Vector3(5.5f, 0f, 1.5f));
         ForgetAll();
         int sightingsBefore = FatherMemory.Sightings(Room("동쪽 복도"));
@@ -390,7 +390,7 @@ public static class FatherTestSceneValidator
         father.enabled = true;
         father.StandStill(5f);
         for (waited = 0f; waited < 2f && father.Current != FatherAI.Mode.Chase; waited += 0.05f) yield return 0.05f;
-        Check(father.Current == FatherAI.Mode.Chase, "준비: 서쪽 복도에서 탐정 발견 → 추격");
+        Check(father.Current == FatherAI.Mode.Chase, "준비: 서쪽 복도에서 여동생 발견 → 추격");
         Place(p1, new Vector3(-2f, 0f, 5f));               // 시야에서 사라짐 (잠긴 안방)
         for (waited = 0f; waited < 6f && father.Current != FatherAI.Mode.Intercept; waited += 0.1f) yield return 0.1f;
         Check(father.Current == FatherAI.Mode.Intercept && father.PredictionLearned && CameraTrigger.FindAt(father.PredictedPoint)?.roomName == "주방",
@@ -435,7 +435,7 @@ public static class FatherTestSceneValidator
             father.StandStill(1f);
             ForgetAll();
             yield return 0.1f;
-            NoiseSystem.Emit(kidInside, 20f, NoiseKind.Run, p1.gameObject); // 아이방 안에서 소리 (탐정은 실제로는 안방에 있음)
+            NoiseSystem.Emit(kidInside, 20f, NoiseKind.Run, p1.gameObject); // 아이방 안에서 소리 (여동생은 실제로는 안방에 있음)
             yield return 0.1f;
             Check(kidDoor.door.IsLocked && RoomOf(father) == "서쪽 복도",
                 $"준비({tactic}): 아이방 문 잠김, 아버지는 서쪽 복도 (문 {kidDoor.door.State}, 아버지 {RoomOf(father)}, {father.StateLabel})");
@@ -529,9 +529,9 @@ public static class FatherTestSceneValidator
         foreach (float s in SetLock(Entry("안방 문"), false)) yield return s;
         HidingSpot closet = Spot("안방 옷장");
         Place(p1, closet.transform.position);
-        closet.TryEnter(p1);                                 // 조작 중인 탐정은 숨음 (직감 대상에서 빠짐)
+        closet.TryEnter(p1);                                 // 조작 중인 여동생은 숨음 (직감 대상에서 빠짐)
         yield return closet.enterTime + 0.2f;
-        Place(p2, new Vector3(5f, 0f, -8.2f));              // 조수는 세탁실 구석에 서 있음
+        Place(p2, new Vector3(5f, 0f, -8.2f));              // 오빠는 세탁실 구석에 서 있음
         Place(father, new Vector3(-2f, 0f, -1.5f), 180f);
         ForgetAll();
         father.intuitionChance = 1f;
@@ -539,12 +539,12 @@ public static class FatherTestSceneValidator
         father.enabled = true;
         father.ResetToProwl();
         Check(p1.IsActive && p1.IsHidden && father.IntuitionTarget == p2 && father.ProwlRoom == p2.CurrentRoom,
-            $"직감: 숨은 캐릭터는 빼고, 조작하지 않는 조수가 있는 방(세탁실)으로 감 (고른 방 {father.ProwlRoom?.roomName})");
+            $"직감: 숨은 캐릭터는 빼고, 조작하지 않는 오빠가 있는 방(세탁실)으로 감 (고른 방 {father.ProwlRoom?.roomName})");
         father.intuitionChance = 0f;                         // 연달아 작동하지 않도록
         for (waited = 0f; waited < 20f && !game.IsTargeted(p2); waited += 0.1f) yield return 0.1f;
         Check(game.IsTargeted(p2) && !p2.IsActive, $"직감으로 찾아가 조작하지 않는 캐릭터를 발견 → 추격 ({waited:0.0}초)");
         Freeze();
-        Check(!p2.IsCaught, "준비: 조수는 잡히지 않음");
+        Check(!p2.IsCaught, "준비: 오빠는 잡히지 않음");
         closet.Exit(p1);
         yield return closet.exitTime + 0.2f;
         father.intuitionCooldown = defaultCooldown;
@@ -562,7 +562,7 @@ public static class FatherTestSceneValidator
         father.enabled = true;
         father.StandStill(5f);
         for (waited = 0f; waited < 2f && father.Current != FatherAI.Mode.Chase; waited += 0.05f) yield return 0.05f;
-        Check(father.Current == FatherAI.Mode.Chase && game.IsTargeted(p1), "준비: 주방에 있는 탐정을 발견 → 추격");
+        Check(father.Current == FatherAI.Mode.Chase && game.IsTargeted(p1), "준비: 주방에 있는 여동생을 발견 → 추격");
         father.enabled = false;                              // 숨는 동안 잠깐 멈춤
         motor.Stop();
         Place(father, new Vector3(-11f, 0f, 1.5f), 0f);     // 숨는 장면이 보이지 않는 곳

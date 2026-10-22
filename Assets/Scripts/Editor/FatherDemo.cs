@@ -287,7 +287,7 @@ public static class FatherDemo
         Place(father, new Vector3(4.8f, 0f, -2f), 11f);
         Place(p1, new Vector3(5.5f, 0f, 1.5f));
         ForgetAll();
-        Say("④ 동쪽 복도에서 탐정이 아버지 눈에 띕니다.");
+        Say("④ 동쪽 복도에서 여동생이 아버지 눈에 띕니다.");
         yield return 1.5f;
         ForgetAll();   // 자막을 보여 주는 동안 눈(감각)은 켜져 있었으므로 새로 시작
         father.enabled = true;
@@ -295,12 +295,12 @@ public static class FatherDemo
         for (float t = 0f; t < 3f && father.Current != FatherAI.Mode.Chase; t += 0.05f) yield return 0.05f;
         move1.scriptedRun = true;
         move1.scriptedInput = new Vector2(1f, 0f);
-        Say("④ 발견 → 추격 상태! 탐정이 동쪽으로 달아납니다.");
+        Say("④ 발견 → 추격 상태! 여동생이 동쪽으로 달아납니다.");
         yield return 0.3f;
         move1.scriptedInput = null;
         move1.scriptedRun = false;
         Place(p1, new Vector3(-2f, 0f, 5f));    // 시야에서 사라짐 (시연용 순간이동, 잠긴 안방)
-        foreach (float s in Watch("④ 탐정이 시야에서 사라짐 (시연용 순간이동).\n아버지는 잠깐(1.2초) 두리번거린 뒤, 마지막으로 본 곳을 지나 탐정이 달리던 방향(동쪽 끝)을 예측해 앞질러 갑니다. (씬 뷰 보라색 선)", 6f,
+        foreach (float s in Watch("④ 여동생이 시야에서 사라짐 (시연용 순간이동).\n아버지는 잠깐(1.2초) 두리번거린 뒤, 마지막으로 본 곳을 지나 여동생이 달리던 방향(동쪽 끝)을 예측해 앞질러 갑니다. (씬 뷰 보라색 선)", 6f,
                      () => father.Current == FatherAI.Mode.SearchSpots || father.Current == FatherAI.Mode.Search)) yield return s;
         foreach (float s in Watch("④ 예측한 곳에도 없으면 근처 숨는 곳 일부를 무작위로 뒤지고, 주변을 수색하다가…", 20f,
                      () => father.Current == FatherAI.Mode.Prowl)) yield return s;
@@ -317,7 +317,7 @@ public static class FatherDemo
         Place(p2, new Vector3(5f, 0f, -8.2f));
         Place(father, new Vector3(-2f, 0f, -1.5f), 180f);
         ForgetAll();
-        Say("⑤ 직감: 조작 중인 탐정은 안방 옷장에 숨었고, 조작하지 않는 조수는 세탁실에 서 있습니다.\n(실제 게임에서 직감은 20% 확률 · 35초에 최대 1번 · 숨은 캐릭터는 제외. 시연을 위해 이번엔 반드시 작동)");
+        Say("⑤ 직감: 조작 중인 여동생은 안방 옷장에 숨었고, 조작하지 않는 오빠는 세탁실에 서 있습니다.\n(실제 게임에서 직감은 20% 확률 · 35초에 최대 1번 · 숨은 캐릭터는 제외. 시연을 위해 이번엔 반드시 작동)");
         yield return 4f;
         father.intuitionChance = 1f;
         father.ClearIntuitionCooldown();
@@ -326,9 +326,9 @@ public static class FatherDemo
         father.intuitionChance = 0f;
         foreach (float s in Watch("⑤ 아버지가 '왠지' 세탁실 쪽으로 향합니다. 정확한 위치는 모르고 방까지만 갑니다.", 20f,
                      () => game.IsTargeted(p2), 0.02f)) yield return s;   // 잡기 전에 멈추도록 촘촘히 확인
-        if (game.RestartPending) { Say("⑤ 조수가 잡혀 씬이 재시작됩니다. 시연은 여기서 끝납니다."); yield return 4f; ChaseDebugOverlay.Caption = ""; yield break; }
+        if (game.RestartPending) { Say("⑤ 오빠가 잡혀 씬이 재시작됩니다. 시연은 여기서 끝납니다."); yield return 4f; ChaseDebugOverlay.Caption = ""; yield break; }
         Freeze();
-        Say("⑤ 조작하지 않던 조수를 발견! (시연을 위해 여기서 멈춤)");
+        Say("⑤ 조작하지 않던 오빠를 발견! (시연을 위해 여기서 멈춤)");
         yield return 3.5f;
         closet.Exit(p1);
         Place(p2, new Vector3(-1f, 0f, 5f));
@@ -438,7 +438,7 @@ public static class FatherDemo
         Place(father, new Vector3(-10f, 0f, 1.5f), 160f);
         Place(p1, new Vector3(-9f, 0f, -1.5f));
         ForgetAll();
-        Say("⑦-c (기록을 미리 넣음) '서쪽 복도에서 주방으로 도망쳐 2번 따돌림'.\n서쪽 복도에서 탐정을 발견했다가 놓치면…");
+        Say("⑦-c (기록을 미리 넣음) '서쪽 복도에서 주방으로 도망쳐 2번 따돌림'.\n서쪽 복도에서 여동생을 발견했다가 놓치면…");
         yield return 4f;
         ForgetAll();
         father.enabled = true;
@@ -446,7 +446,7 @@ public static class FatherDemo
         for (float t = 0f; t < 3f && father.Current != FatherAI.Mode.Chase; t += 0.05f) yield return 0.05f;
         yield return 0.4f;
         Place(p1, new Vector3(6f, 0f, 4.5f));   // 시야에서 사라짐 (시연용 순간이동, 서재)
-        foreach (float s in Watch("⑦-c 탐정이 사라짐 → 두리번 → 늘 도망치던 주방 쪽 길목(주방 문 안쪽)으로 먼저 갑니다.", 12f,
+        foreach (float s in Watch("⑦-c 여동생이 사라짐 → 두리번 → 늘 도망치던 주방 쪽 길목(주방 문 안쪽)으로 먼저 갑니다.", 12f,
                      () => father.Current == FatherAI.Mode.Intercept && motor.Arrived(0.6f))) yield return s;
         foreach (float s in Watch("⑦-c 길목에서 기다리며 확인", 3f)) yield return s;
         Freeze();
@@ -460,7 +460,7 @@ public static class FatherDemo
         Place(p1, new Vector3(-8f, 0f, -5.5f));
         Place(father, new Vector3(-8f, 0f, -0.5f), 180f);
         ForgetAll();
-        Say("⑧ 마지막: 열린 주방 문 너머로 탐정이 보입니다.");
+        Say("⑧ 마지막: 열린 주방 문 너머로 여동생이 보입니다.");
         yield return 1.5f;
         ForgetAll();   // 자막을 보여 주는 동안 눈(감각)은 켜져 있었으므로 새로 시작
         father.enabled = true;
@@ -473,7 +473,7 @@ public static class FatherDemo
         Place(father, new Vector3(-11f, 0f, 1.5f), 0f);
         Place(p1, pantry.transform.position);
         pantry.TryEnter(p1);
-        Say("⑧ 탐정은 아버지가 못 보는 사이에 팬트리에 숨었습니다. (경찰이었다면 숨는 장면을 못 봤으니 지나쳤을 상황)");
+        Say("⑧ 여동생은 아버지가 못 보는 사이에 팬트리에 숨었습니다. (경찰이었다면 숨는 장면을 못 봤으니 지나쳤을 상황)");
         yield return 3f;
         father.enabled = true;
         foreach (float s in Watch("⑧ 아버지는 놓친 곳 근처의 숨는 곳을 뒤집니다…", 25f, () => p1.IsCaught)) yield return s;

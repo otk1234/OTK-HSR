@@ -209,8 +209,8 @@ public static class ChaseTestSceneBuilder
         Hide(hiding, "샤워 커튼", HidingKind.Curtain, new Vector3(-8.5f, 0f, -5.9f), enter: 0.3f, exit: 0.25f, noise: 1.5f, exposed: 1.2f);
 
         // 6) 캐릭터 2명 (거실에서 시작)
-        GameObject detective = BuildPlayer("탐정 (Player1)", CharacterType.Player1, new Vector3(-6f, 1f, 1.2f), Color.white);
-        GameObject assistant = BuildPlayer("조수 (Player2)", CharacterType.Player2, new Vector3(-5f, 1f, 1.8f), new Color(0.65f, 0.82f, 1f));
+        GameObject sister = BuildPlayer(PlayerName(CharacterType.Player1), CharacterType.Player1, new Vector3(-6f, 1f, 1.2f), Color.white);
+        GameObject brother = BuildPlayer(PlayerName(CharacterType.Player2), CharacterType.Player2, new Vector3(-5f, 1f, 1.8f), new Color(0.65f, 0.82f, 1f));
 
         // 7) 경찰 (홀에서 순찰 시작, 창문·환풍구 못 씀)
         BuildPolice();
@@ -218,7 +218,7 @@ public static class ChaseTestSceneBuilder
         // 8) 시스템
         PrototypeSceneBuilder.BuildFadeCanvas();
         var systems = new GameObject("Game Systems");
-        systems.AddComponent<CharacterManager>().players = new[] { detective, assistant };
+        systems.AddComponent<CharacterManager>().players = new[] { sister, brother };
         systems.AddComponent<GameStateManager>();
         systems.AddComponent<RoomCameraSync>();
         systems.AddComponent<ChaseDebugOverlay>();
@@ -481,6 +481,13 @@ public static class ChaseTestSceneBuilder
     }
 
     // ---------------- 캐릭터 ----------------
+
+    // 오브젝트 이름 = 캐릭터 프로필 이름 + 번호 (예: "여동생 (Player1)")
+    internal static string PlayerName(CharacterType type)
+    {
+        CharacterProfileValidator.EnsureAssets();
+        return $"{CharacterRoster.NameOf(type)} ({type})";
+    }
 
     internal static GameObject BuildPlayer(string name, CharacterType type, Vector3 position, Color tint)
     {

@@ -36,7 +36,7 @@ public sealed class PlannerReferenceDemo : MonoBehaviour
         if (originalHud != null) originalHud.enabled = false;
 
         var integration = FindFirstObjectByType<PrototypeIntegration>();
-        integration.EnableSiblingCharacterRules();
+        // [OTK 통합] 남매 이름·칸 수는 캐릭터 프로필(CharacterRoster)에서 가져오므로 EnableSiblingCharacterRules 호출 삭제
         integration.EnableOverviewCameraFollow();
         PrototypeFloorTravel.EnsureCreated(integration);
         CreateSaveBed();
@@ -166,8 +166,8 @@ public sealed class PlannerReferenceDemo : MonoBehaviour
         int index = manager.ActivePlayerIndex;
         CharacterUiState state = states[active];
         Inventory inventory = active.GetComponent<Inventory>();
-        string character = index == 0 ? "여동생" : "오빠";
-        int inventoryCapacity = index == 1 ? 6 : 5;
+        string character = CharacterRoster.NameOf(active); // [OTK 통합] 캐릭터 프로필 이름
+        int inventoryCapacity = inventory.Capacity; // [OTK 통합] 캐릭터 프로필 칸 수
         string location = active.transform.position.x > 40 ? "저택 · 2층" : "저택 · 1층";
 
         Panel(new Rect(20, 20, 285, 88));
@@ -215,7 +215,7 @@ public sealed class PlannerReferenceDemo : MonoBehaviour
     private void Portrait(Rect rect, int index)
     {
         GUI.color = new Color(.12f, .14f, .18f); GUI.DrawTexture(rect, Texture2D.whiteTexture);
-        GUI.color = index == 0 ? new Color(.75f, .45f, .58f) : new Color(.25f, .55f, .85f);
+        GUI.color = index == 0 ? new Color(.75f, .45f, .58f) : new Color(.25f, .55f, .85f); // [OTK 통합] 0번 여동생 = 분홍
         GUI.DrawTexture(new Rect(rect.x + 26, rect.y + 12, 30, 30), Texture2D.whiteTexture);
         GUI.DrawTexture(new Rect(rect.x + 17, rect.y + 46, 48, 28), Texture2D.whiteTexture);
     }

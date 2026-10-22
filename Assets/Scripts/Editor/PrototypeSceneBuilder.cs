@@ -117,13 +117,16 @@ public static class PrototypeSceneBuilder
         BakeNavMesh();
         teammatePlayer.SetActive(true);
 
-        // 2) 캐릭터 2명: 팀원 플레이어(2D 스프라이트)를 내 이동/상호작용 시스템으로 바꾸고 복제
-        GameObject detective = ConvertPlayer(teammatePlayer, "탐정 (Player1)", CharacterType.Player1, inspectionCamera, hud);
-        GameObject assistant = Object.Instantiate(detective);
-        assistant.name = "조수 (Player2)";
-        assistant.transform.position = detective.transform.position + new Vector3(1.1f, 0f, -0.6f);
-        assistant.GetComponent<PlayerInteraction>().myType = CharacterType.Player2;
-        assistant.GetComponentInChildren<SpriteRenderer>().color = new Color(0.65f, 0.82f, 1f);
+        // 2) 캐릭터 2명 (0번 여동생, 1번 오빠 — 이름은 캐릭터 프로필): 팀원 플레이어(2D 스프라이트)를 내 이동/상호작용 시스템으로 바꾸고 복제
+        CharacterProfileValidator.EnsureAssets();
+        string sisterName = CharacterRoster.NameOf(CharacterType.Player1);
+        string brotherName = CharacterRoster.NameOf(CharacterType.Player2);
+        GameObject sister = ConvertPlayer(teammatePlayer, sisterName + " (Player1)", CharacterType.Player1, inspectionCamera, hud);
+        GameObject brother = Object.Instantiate(sister);
+        brother.name = brotherName + " (Player2)";
+        brother.transform.position = sister.transform.position + new Vector3(1.1f, 0f, -0.6f);
+        brother.GetComponent<PlayerInteraction>().myType = CharacterType.Player2;
+        brother.GetComponentInChildren<SpriteRenderer>().color = new Color(0.65f, 0.82f, 1f);
 
         // 3) 카메라: 평소엔 구역별 고정 카메라(Cinemachine Cut), 조사할 때만 팀원의 클로즈업 카메라
         var brain = mainCamera.gameObject.AddComponent<CinemachineBrain>();
@@ -137,7 +140,7 @@ public static class PrototypeSceneBuilder
         BuildFadeCanvas();
         DialogueManager dialogue = BuildDialogueCanvas();
 
-        // 5) 퍼즐: 열쇠 → 창고 문 → 공구 상자(조수) → 다용도실 문 → 암호 메모(탐정)
+        // 5) 퍼즐: 열쇠 → 창고 문 → 공구 상자(힘 = 오빠) → 다용도실 문 → 암호 메모(정보 수집 = 여동생)
         Material timber = LoadMaterial("DemoTimber");
         Material paper = LoadMaterial("Clue");
 
@@ -151,21 +154,20 @@ public static class PrototypeSceneBuilder
         InteractableDoor pantryDoor = BuildDoor("다용도실 문", new Vector3(-5f, 0f, -1.1f), 1.7f, "공구 상자",
             "문틀이 뒤틀려 꿈쩍도 하지 않는다. 공구가 필요하다.", "공구로 문틀을 비틀어 열었다.", timber);
 
-        BuildItem("공구 상자", new Vector3(-4.6f, 0f, 6.6f), new Vector3(0.8f, 0.5f, 0.55f), CharacterType.Player2,
-            "너무 무거워서 들 수 없다... 조수에게 부탁하자.", timber);
-        BuildItem("암호 메모", new Vector3(-6.3f, 0f, 0.1f), new Vector3(0.35f, 0.04f, 0.45f), CharacterType.Player1,
-            "알아볼 수 없는 암호다. 탐정이라면 읽을 수 있을지도.", paper)
+        BuildItem("공구 상자", new Vector3(-4.6f, 0f, 6.6f), new Vector3(0.8f, 0.5f, 0.55f), CharacterTrait.Strength,
+            $"너무 무거워서 들 수 없다... {brotherName}에게 부탁하자.", timber);
+        BuildItem("암호 메모", new Vector3(-6.3f, 0f, 0.1f), new Vector3(0.35f, 0.04f, 0.45f), CharacterTrait.Investigation,
+            $"알아볼 수 없는 암호다. {sisterName}에게 맡겨 보자.", paper)
             .pickupMessage = "'0900' — 서재의 멈춘 시계와 같은 시각이다. 그날 밤 9시에 무슨 일이 있었던 걸까.";
 
-        BuildNpc(detective.GetComponentInChildren<SpriteCharacterVisual>().gameObject);
+        BuildNpc(sister.GetComponentInChildren<SpriteCharacterVisual>().gameObject);
 
         // 6) 게임 시스템 (내 CharacterManager + 연결 스크립트)
         var systems = new GameObject("Game Systems");
         var manager = systems.AddComponent<CharacterManager>();
-        manager.players = new[] { detective, assistant };
+        manager.players = new[] { sister, brother };
 
         var integration = systems.AddComponent<PrototypeIntegration>();
-        integration.characterNames = new[] { "탐정", "조수" };
         integration.hud = hud;
         integration.inspectionCamera = inspectionCamera;
         integration.occlusionFader = occlusionFader;
@@ -175,16 +177,16 @@ public static class PrototypeSceneBuilder
         {
             new PrototypeIntegration.Objective { text = "서재 책상을 조사해서 단서를 찾자.", completeWhenItemHeld = "황동 열쇠" },
             new PrototypeIntegration.Objective { text = "황동 열쇠로 현관 옆 창고 문을 열자.", completeWhenDoorOpen = storageDoor },
-            new PrototypeIntegration.Objective { text = "창고의 공구 상자를 옮기자. (조수만 들 수 있다)", completeWhenItemHeld = "공구 상자" },
+            new PrototypeIntegration.Objective { text = $"창고의 공구 상자를 옮기자. ({brotherName}만 들 수 있다)", completeWhenItemHeld = "공구 상자" },
             new PrototypeIntegration.Objective { text = "공구로 다용도실 문을 열자.", completeWhenDoorOpen = pantryDoor },
-            new PrototypeIntegration.Objective { text = "다용도실의 메모를 확인하자. (탐정만 읽을 수 있다)", completeWhenItemHeld = "암호 메모" },
+            new PrototypeIntegration.Objective { text = $"다용도실의 메모를 확인하자. ({sisterName}만 읽을 수 있다)", completeWhenItemHeld = "암호 메모" },
         };
         integration.completeMessage = "프로토타입 목표 달성! 메모의 암호를 손에 넣었다.";
 
         // 7) HUD 초기값
         var hudData = new SerializedObject(hud);
         hudData.FindProperty("location").stringValue = "거실 · 주방";
-        hudData.FindProperty("character").stringValue = "탐정";
+        hudData.FindProperty("character").stringValue = sisterName;
         hudData.ApplyModifiedPropertiesWithoutUndo();
 
         EditorSceneManager.MarkSceneDirty(scene);
@@ -433,7 +435,7 @@ public static class PrototypeSceneBuilder
         return door;
     }
 
-    static InteractableItem BuildItem(string itemName, Vector3 floorPosition, Vector3 size, CharacterType who, string failMessage, Material material)
+    static InteractableItem BuildItem(string itemName, Vector3 floorPosition, Vector3 size, CharacterTrait requiredTrait, string failMessage, Material material)
     {
         var root = new GameObject("Item_" + itemName);
         root.tag = "Item";
@@ -451,7 +453,7 @@ public static class PrototypeSceneBuilder
 
         var item = root.AddComponent<InteractableItem>();
         item.itemName = itemName;
-        item.requiredCharacter = who;
+        item.requiredTrait = requiredTrait;
         item.failMessage = failMessage;
         return item;
     }

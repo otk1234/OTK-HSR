@@ -3,13 +3,16 @@ using UnityEngine;
 
 // E로 쓰는 캐릭터 전용 상호작용의 공통 부분 (무거운 물건 밀기, 기계 수리 …).
 // 트리거 콜라이더가 있는 오브젝트에 붙이면 PlayerInteraction이 근처 대상으로 잡습니다.
-// 조건에 맞지 않는 캐릭터가 쓰면 failMessage만 띄웁니다 (InteractableItem의 requiredCharacter와 같은 방식).
+// 조건(특성)에 맞지 않는 캐릭터가 쓰면 failMessage만 띄웁니다 (InteractableItem과 같은 CharacterRoster.CanUse 판정).
 public abstract class CharacterInteractable : MonoBehaviour
 {
     [Header("표시 이름")]
     public string displayName = "물건";
 
-    [Header("쓸 수 있는 캐릭터")]
+    [Header("쓸 수 있는 조건: 필요한 특성 (None = 누구나)")]
+    public CharacterTrait requiredTrait = CharacterTrait.None;
+
+    [Header("(예전 방식) 이 캐릭터만 — 새로 만들 때는 특성을 쓸 것")]
     public CharacterType requiredCharacter = CharacterType.All;
 
     [Header("조건 실패 시 출력할 메시지")]
@@ -30,7 +33,7 @@ public abstract class CharacterInteractable : MonoBehaviour
     // 캐릭터마다 걸리는 시간이 다르면 덮어씀 (예: 시체 치우기는 여동생이 오래 걸림)
     public virtual float WorkTimeFor(CharacterType who) => WorkTime;
 
-    public bool CanUse(CharacterType type) => requiredCharacter == CharacterType.All || requiredCharacter == type;
+    public bool CanUse(CharacterType type) => CharacterRoster.CanUse(type, requiredCharacter, requiredTrait);
 
     public string Prompt => Busy ? $"{displayName} {ActionLabel}..." : Available ? $"[E] {displayName} {ActionLabel}" : "";
 

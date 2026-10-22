@@ -53,7 +53,7 @@ public static class CrimeSceneTestSceneValidator
         if (areas.Length != 7) problems.Add($"조사 지점 7개가 아님 ({areas.Length})");
         if (clues.Length != 9) problems.Add($"단서 9개가 아님 ({clues.Length})");
         if (clues.Select(c => c.clueId).Distinct().Count() != clues.Length) problems.Add("단서 ID 중복");
-        if (clues.Count(c => c.visibleTo == CharacterType.Player1) != 1) problems.Add("여동생 전용 단서 1개가 아님");
+        if (clues.Count(c => c.visibleToTrait == CharacterTrait.Investigation && c.IsVisibleTo(CharacterType.Player1) && !c.IsVisibleTo(CharacterType.Player2)) != 1) problems.Add("정보 수집(여동생) 전용 단서 1개가 아님");
         foreach (InspectionArea area in areas)
             if (area.Items == null || area.Items.Length == 0 || area.Items.Any(i => i == null || i.GetComponent<Clue>() == null))
                 problems.Add($"{area.Title}: 조사 항목 없음 또는 단서 표시 없음");
@@ -63,7 +63,7 @@ public static class CrimeSceneTestSceneValidator
             if (area == null || area.gameObject.activeSelf) problems.Add($"{hidden}: 처음에 숨겨져 있지 않음");
         }
         var heavy = Object.FindAnyObjectByType<HeavyObject>();
-        if (heavy == null || heavy.requiredCharacter != CharacterType.Player2 || heavy.revealWhenMoved.Length == 0) problems.Add("책장(오빠 전용 무거운 물건) 설정 안 됨");
+        if (heavy == null || heavy.requiredTrait != CharacterTrait.Strength || !heavy.CanUse(CharacterType.Player2) || heavy.CanUse(CharacterType.Player1) || heavy.revealWhenMoved.Length == 0) problems.Add("책장(힘 특성 = 오빠 전용 무거운 물건) 설정 안 됨");
         var board = Object.FindAnyObjectByType<DeductionBoard>();
         if (board == null || board.deduction == null || board.timer == null) problems.Add("추리 창(DeductionBoard) 연결 안 됨");
         else
@@ -83,7 +83,7 @@ public static class CrimeSceneTestSceneValidator
         var planner = Object.FindAnyObjectByType<InterventionPlanner>();
         if (planner == null || planner.board == null) problems.Add("개입 방향 대화(InterventionPlanner) 연결 안 됨");
         var machine = Object.FindAnyObjectByType<RepairableMachine>();
-        if (machine == null || machine.requiredCharacter != CharacterType.Player2 || machine.revealWhenRepaired.Length == 0) problems.Add("녹화기(오빠 전용 기계) 설정 안 됨");
+        if (machine == null || machine.requiredTrait != CharacterTrait.Mechanics || !machine.CanUse(CharacterType.Player2) || machine.CanUse(CharacterType.Player1) || machine.revealWhenRepaired.Length == 0) problems.Add("녹화기(기계 조작 특성 = 오빠 전용 기계) 설정 안 됨");
 
         foreach (CameraTrigger room in Object.FindObjectsByType<CameraTrigger>())
         {
@@ -292,7 +292,7 @@ public static class CrimeSceneTestSceneValidator
             "한 번 답한 질문은 바꿀 수 없음 → 다음 질문");
         CaseDeduction.Question culprit = data.Find("culprit");
         List<CaseDeduction.Option> sisterView = board.VisibleOptions(culprit, CharacterType.Player1), brotherView = board.VisibleOptions(culprit, CharacterType.Player2);
-        Check(sisterView.Count == 4 && brotherView.Count == 3 && sisterView[1].onlyFor == CharacterType.Player1 && sisterView[1].Unlocked,
+        Check(sisterView.Count == 4 && brotherView.Count == 3 && sisterView[1].onlyForTrait == CharacterTrait.Investigation && sisterView[1].Unlocked,
             "여동생에게만 '섬유' 근거 선택지가 보임 (오빠는 녹화 영상 근거만)");
         Check(board.Choose(1) && CaseState.TryGet(data.caseId, "culprit", out CaseState.Answer culpritAnswer) && culpritAnswer.correct && culpritAnswer.answeredBy == CharacterType.Player2,
             "오빠가 녹화 영상 근거로 '아빠' 정답");
@@ -330,7 +330,7 @@ public static class CrimeSceneTestSceneValidator
             $"여동생이 시체를 옮기는 중 (진행 {hideBody.Progress:P0}, 이동 잠김)");
         for (float waited = 0f; waited < 10f && !hideBody.Done; waited += 0.25f) yield return 0.25f;
         float took = Time.time - workStarted;
-        Check(hideBody.Done && took >= hideBody.sisterTime - 0.5f, $"여동생은 오래 걸림 ({took:0.0}초)");
+        Check(hideBody.Done && took >= hideBody.WorkTimeFor(CharacterType.Player1) - 0.5f, $"여동생은 오래 걸림 ({took:0.0}초)");
         Check(CaseState.HasIntervened(data.caseId) && CaseState.Interventions[0].kind == InterventionKind.Abet && CaseState.Interventions[0].doneBy == CharacterType.Player1,
             "개입 기록 (가담, 여동생)");
         Check(GuiltSystem.Value == 58 && !Area("시체").gameObject.activeInHierarchy, $"가담 → 죄책감 +8 ({GuiltSystem.Value}), 시체가 치워짐");

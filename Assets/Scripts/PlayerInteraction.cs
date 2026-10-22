@@ -66,14 +66,18 @@ public class PlayerInteraction : MonoBehaviour
             // 1순위: 바닥에 떨어진 아이템 줍기
             if (nearbyItem != null)
             {
-                if (nearbyItem.requiredCharacter == CharacterType.All || nearbyItem.requiredCharacter == myType)
+                if (!nearbyItem.CanPickUp(myType))
                 {
-                    nearbyItem.PickUp(myInventory);
-                    nearbyItem = null;
+                    GameMessage.Show(nearbyItem.failMessage);
+                }
+                else if (myInventory.IsFull)
+                {
+                    GameMessage.Show(Inventory.FullMessage);
                 }
                 else
                 {
-                    GameMessage.Show(nearbyItem.failMessage);
+                    nearbyItem.PickUp(myInventory);
+                    nearbyItem = null;
                 }
             }
 

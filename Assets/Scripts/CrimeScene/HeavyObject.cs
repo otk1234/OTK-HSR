@@ -1,7 +1,7 @@
 using System.Collections;
 using UnityEngine;
 
-// 무거운 물건 (책장·냉장고 …): 조건에 맞는 캐릭터(기본: 오빠)가 E로 밀어 옆으로 치웁니다.
+// 무거운 물건 (책장·냉장고 …): 조건에 맞는 캐릭터(보통 힘 특성 = 오빠)가 E로 밀어 옆으로 치웁니다.
 // 치우고 나면 뒤에 가려져 있던 오브젝트(조사 지점 등)를 켭니다.
 // 길을 막는 부분은 자식의 NavMeshObstacle(Carve)이라, 옮기면 길도 같이 바뀝니다.
 public class HeavyObject : CharacterInteractable

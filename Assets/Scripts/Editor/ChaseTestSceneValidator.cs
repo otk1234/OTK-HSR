@@ -487,7 +487,7 @@ public static class ChaseTestSceneValidator
         closet.Exit(p2);
         yield return closet.exitTime + 0.2f;
         Check(!closet.IsOccupied && !closet.WasSeenEnteringBy(chaser.gameObject), "모두 나오면 목격 기록 초기화");
-        Place(p1, new Vector3(6f, 0f, 5f));                 // 탐정은 멀리 (서재)
+        Place(p1, new Vector3(6f, 0f, 5f));                 // 여동생은 멀리 (서재)
         Place(chaser, closet.transform.position + new Vector3(0f, 0f, -3f), 0f);
         policeAI.ResetToPatrol();
         motor.Stop(); // 옷장 쪽을 보고 서 있도록

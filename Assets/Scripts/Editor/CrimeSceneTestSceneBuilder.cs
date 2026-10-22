@@ -147,8 +147,8 @@ public static class CrimeSceneTestSceneBuilder
             BuildEvidence(evidence);
 
             // 6) 캐릭터 2명 (0번 = 여동생, 1번 = 오빠). 현관에서 시작
-            GameObject sister = B.BuildPlayer("여동생 (Player1)", CharacterType.Player1, new Vector3(4.6f, 1f, 4.4f), Color.white);
-            GameObject brother = B.BuildPlayer("오빠 (Player2)", CharacterType.Player2, new Vector3(5.6f, 1f, 4.9f), new Color(0.65f, 0.82f, 1f));
+            GameObject sister = B.BuildPlayer(B.PlayerName(CharacterType.Player1), CharacterType.Player1, new Vector3(4.6f, 1f, 4.4f), Color.white);
+            GameObject brother = B.BuildPlayer(B.PlayerName(CharacterType.Player2), CharacterType.Player2, new Vector3(5.6f, 1f, 4.9f), new Color(0.65f, 0.82f, 1f));
 
             // 팀원 조사·HUD
             var hud = new GameObject("HUD").AddComponent<SimpleGameHud>();
@@ -156,7 +156,7 @@ public static class CrimeSceneTestSceneBuilder
             hudData.FindProperty("date").stringValue = "사건 당일";
             hudData.FindProperty("time").stringValue = "21:10";
             hudData.FindProperty("location").stringValue = "현관";
-            hudData.FindProperty("character").stringValue = "여동생";
+            hudData.FindProperty("character").stringValue = CharacterRoster.NameOf(CharacterType.Player1);
             hudData.ApplyModifiedPropertiesWithoutUndo();
             foreach (GameObject player in new[] { sister, brother })
                 player.AddComponent<PlayerInteractor3D>().Configure(inspectionCamera, null, hud);
@@ -175,7 +175,6 @@ public static class CrimeSceneTestSceneBuilder
             systems.AddComponent<GameStateManager>();
 
             var integration = systems.AddComponent<PrototypeIntegration>();
-            integration.characterNames = new[] { "여동생", "오빠" };
             integration.hud = hud;
             integration.inspectionCamera = inspectionCamera;
             integration.occlusionFader = occlusionFader;
@@ -272,7 +271,7 @@ public static class CrimeSceneTestSceneBuilder
             new Vector3(-2.95f, 0.14f, -3.4f), new Vector3(0.3f, 0.26f, 0.3f), skinMat, PrimitiveType.Sphere);
         Item(body, "navy_fiber", "손톱 밑 섬유",
             "손톱 밑에 남색 털실이 끼어 있다. ...아빠의 남색 외투와 같은 색이다.",
-            new Vector3(-3.05f, 0.09f, -2.95f), new Vector3(0.12f, 0.05f, 0.12f), fiberMat, visibleTo: CharacterType.Player1);
+            new Vector3(-3.05f, 0.09f, -2.95f), new Vector3(0.12f, 0.05f, 0.12f), fiberMat, visibleTo: CharacterTrait.Investigation);
         Visual(root, "피 웅덩이", new Vector3(-2.6f, 0.012f, -3.5f), new Vector3(1.1f, 0.004f, 0.9f), bloodMat, PrimitiveType.Cylinder);
 
         // 이어진 핏자국: 시체 옆 → 욕실 문 (조사 지점은 문 트리거와 겹치지 않게 문에서 떨어뜨림)
@@ -331,12 +330,12 @@ public static class CrimeSceneTestSceneBuilder
         Visual(root, "피해자 휴대전화", new Vector3(-4.6f, 0.57f, 5.55f), new Vector3(0.1f, 0.02f, 0.18f), machineMat);
         BuildIntervention(root, "피해자 휴대전화", new Vector3(-4.6f, 0f, 4.9f), new Vector3(1.6f, 2f, 1.4f), InterventionKind.Incite, "문자 조작하기",
             "피해자 휴대전화로 박 선생에게 '목요일 약속 장소를 인적 없는 공원으로 바꾸자'는 문자를 보냈다. 아버지가 그곳을 택하게 된다.",
-            2.5f, 5f, "incite_crime", "문자를 보냈다. 아빠는... 그곳으로 갈 것이다.");
+            CharacterTrait.Investigation, 2.5f, 5f, "incite_crime", "문자를 보냈다. 아빠는... 그곳으로 갈 것이다.");
 
         // 가담: 시체를 욕실로 옮겨 숨김 (힘 → 오빠가 빠름, 여동생은 오래 걸림)
         Intervention hideBody = BuildIntervention(root, "시체", new Vector3(-3.6f, 0f, -3.4f), new Vector3(2.4f, 2f, 2f), InterventionKind.Abet, "욕실로 옮겨 숨기기",
             "시체를 욕실로 옮겨 숨기고 현장을 정리했다. 발견이 늦어진다.",
-            9f, 3.5f, "abet_crime", "시체를 옮겼다... 이제 돌이킬 수 없다.");
+            CharacterTrait.Strength, 3.5f, 9f, "abet_crime", "시체를 옮겼다... 이제 돌이킬 수 없다.");
         hideBody.hideWhenDone = new[] { body.gameObject };
         hideBody.noiseRadius = 6f;
 
@@ -345,11 +344,11 @@ public static class CrimeSceneTestSceneBuilder
         Visual(root, "펜", new Vector3(4.92f, 0.8f, -2.7f), new Vector3(0.02f, 0.02f, 0.16f), machineMat);
         BuildIntervention(root, "편지지", new Vector3(4.4f, 0f, -1.9f), new Vector3(1.8f, 2f, 1.4f), InterventionKind.Prevent, "경고 편지 쓰기",
             "박 선생에게 '목요일 밤에는 누구도 집에 들이지 마세요'라는 경고 편지를 썼다.",
-            2.5f, 5f, "prevent_crime", "경고 편지를 썼다. 박 선생에게 전해야 한다.");
+            CharacterTrait.Investigation, 2.5f, 5f, "prevent_crime", "경고 편지를 썼다. 박 선생에게 전해야 한다.");
     }
 
     static Intervention BuildIntervention(Transform root, string name, Vector3 floor, Vector3 reachSize, InterventionKind kind, string actionLabel,
-        string summary, float sisterTime, float brotherTime, string guiltActionId, string doneMessage)
+        string summary, CharacterTrait skilledTrait, float skilledTime, float otherTime, string guiltActionId, string doneMessage)
     {
         var go = new GameObject($"개입 ({Intervention.KindName(kind)}): {name}");
         go.transform.SetParent(root);
@@ -364,8 +363,9 @@ public static class CrimeSceneTestSceneBuilder
         intervention.kind = kind;
         intervention.actionLabel = actionLabel;
         intervention.summary = summary;
-        intervention.sisterTime = sisterTime;
-        intervention.brotherTime = brotherTime;
+        intervention.skilledTrait = skilledTrait;
+        intervention.skilledTime = skilledTime;
+        intervention.otherTime = otherTime;
         intervention.guiltActionId = guiltActionId;
         intervention.doneMessage = doneMessage;
         intervention.noiseRadius = 2f;
@@ -391,7 +391,7 @@ public static class CrimeSceneTestSceneBuilder
 
         var heavy = go.AddComponent<HeavyObject>();
         heavy.displayName = name;
-        heavy.requiredCharacter = CharacterType.Player2;
+        heavy.requiredTrait = CharacterTrait.Strength;
         heavy.failMessage = "너무 무거워서 꿈쩍도 하지 않는다... 오빠에게 부탁하자.";
         heavy.pushOffset = pushOffset;
         heavy.noiseRadius = 6f;
@@ -414,7 +414,7 @@ public static class CrimeSceneTestSceneBuilder
 
         var machine = go.AddComponent<RepairableMachine>();
         machine.displayName = name;
-        machine.requiredCharacter = CharacterType.Player2;
+        machine.requiredTrait = CharacterTrait.Mechanics;
         machine.failMessage = "녹화기 덮개 안의 전선이 끊어져 있다. 나는 고칠 줄 모른다... 오빠라면 할 수 있을지도.";
         machine.repairedMessage = "끊어진 전선을 이어 붙였다. 녹화 화면이 다시 켜졌다.";
         machine.indicator = light;
@@ -438,7 +438,7 @@ public static class CrimeSceneTestSceneBuilder
 
     // 조사 항목 하나 = 팀원 InspectionItem(클릭 대상, 마우스를 올리면 외곽선) + 내 Clue(단서 기록)
     static InspectionItem Item(InspectionArea area, string clueId, string title, string description, Vector3 position, Vector3 size,
-        Material material, PrimitiveType shape = PrimitiveType.Cube, CharacterType visibleTo = CharacterType.All)
+        Material material, PrimitiveType shape = PrimitiveType.Cube, CharacterTrait visibleTo = CharacterTrait.None)
     {
         var go = GameObject.CreatePrimitive(shape);
         go.name = title;
@@ -458,7 +458,7 @@ public static class CrimeSceneTestSceneBuilder
         item.Configure(title, description, false, new[] { stroke.GetComponent<Renderer>() });
         var clue = go.AddComponent<Clue>();
         clue.clueId = clueId;
-        clue.visibleTo = visibleTo;
+        clue.visibleToTrait = visibleTo;
 
         area.Items = area.Items.Concat(new[] { item }).ToArray();
         return item;

@@ -44,7 +44,8 @@ MonoBehaviour:
       correct: 1
       needAnyClue:
       - navy_fiber
-      onlyFor: 1
+      onlyFor: 0
+      onlyForTrait: 1
     - text: "\uC544\uBE60\uB2E4. \uB179\uD654 \uC601\uC0C1 \uC18D \uAC78\uC74C\uAC78\uC774\uAC00 \uC544\uBE60\uB2E4."
       correct: 1
       needAnyClue:

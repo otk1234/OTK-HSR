@@ -131,7 +131,7 @@ public static class PrototypeSceneValidator
     static IEnumerator<float> Steps()
     {
         var manager = CharacterManager.instance;
-        GameObject detective = manager.players[0], assistant = manager.players[1];
+        GameObject sister = manager.players[0], brother = manager.players[1];
         var integration = Object.FindFirstObjectByType<PrototypeIntegration>();
         var brain = Object.FindFirstObjectByType<CinemachineBrain>();
         var inspectionCamera = Object.FindFirstObjectByType<IsometricCameraFollow>();
@@ -140,28 +140,32 @@ public static class PrototypeSceneValidator
         InteractableDoor pantryDoor = doors.First(d => d.requiredItemName == "공구 상자");
         CameraTrigger Room(string name) => Object.FindObjectsByType<CameraTrigger>(FindObjectsSortMode.None).First(r => r.roomName == name);
 
-        Check(manager.GetActivePlayer() == detective, "시작 캐릭터 = 탐정");
-        Check(detective.GetComponent<NavMeshAgent>().isOnNavMesh && assistant.GetComponent<NavMeshAgent>().isOnNavMesh, "두 캐릭터 모두 NavMesh 위");
-        Check(detective.GetComponent<PlayerInteractor3D>().enabled && !assistant.GetComponent<PlayerInteractor3D>().enabled, "조사 입력은 조작 중인 캐릭터만");
+        Check(manager.GetActivePlayer() == sister, "시작 캐릭터 = 여동생");
+        Check(sister.name.StartsWith(CharacterRoster.NameOf(CharacterType.Player1)) && brother.name.StartsWith(CharacterRoster.NameOf(CharacterType.Player2))
+              && integration.NameFor(0) == CharacterRoster.NameOf(CharacterType.Player1), "캐릭터 이름은 캐릭터 프로필에서");
+        Check(integration.InventoryCapacityFor(0) == CharacterRoster.CapacityOf(CharacterType.Player1)
+              && integration.InventoryCapacityFor(1) == CharacterRoster.CapacityOf(CharacterType.Player2), "소지품 칸 수는 캐릭터 프로필에서");
+        Check(sister.GetComponent<NavMeshAgent>().isOnNavMesh && brother.GetComponent<NavMeshAgent>().isOnNavMesh, "두 캐릭터 모두 NavMesh 위");
+        Check(sister.GetComponent<PlayerInteractor3D>().enabled && !brother.GetComponent<PlayerInteractor3D>().enabled, "조사 입력은 조작 중인 캐릭터만");
         for (int i = 0; i < 30 && FadeManager.instance.isFading; i++) yield return 0.2f; // 첫 화면 페이드가 끝날 때까지
         yield return 0.5f;
-        Check(Room("거실 · 주방").Contains(detective), "시작 위치가 거실 구역 안으로 인식됨");
+        Check(Room("거실 · 주방").Contains(sister), "시작 위치가 거실 구역 안으로 인식됨");
         Check(Room("거실 · 주방").virtualCamera.activeSelf, "거실 구역 카메라 켜짐");
         Check(Camera.main.orthographic && Mathf.Abs(Mathf.DeltaAngle(Camera.main.transform.eulerAngles.y, 0f)) < 1f, "거실은 고정 탑뷰 시점");
         Check(brain.enabled && !inspectionCamera.enabled, "평소엔 구역 카메라가 화면 담당");
 
         // 이동 → 구역 카메라 전환
-        Vector3 before = detective.transform.position;
-        for (int i = 0; i < 20; i++) detective.GetComponent<NavMeshAgent>().Move(Vector3.right * 0.05f);
-        Check((detective.transform.position - before).magnitude > 0.5f, "NavMeshAgent 이동");
+        Vector3 before = sister.transform.position;
+        for (int i = 0; i < 20; i++) sister.GetComponent<NavMeshAgent>().Move(Vector3.right * 0.05f);
+        Check((sister.transform.position - before).magnitude > 0.5f, "NavMeshAgent 이동");
 
-        detective.GetComponent<NavMeshAgent>().Warp(new Vector3(8.1f, 0f, 2.2f));
+        sister.GetComponent<NavMeshAgent>().Warp(new Vector3(8.1f, 0f, 2.2f));
         yield return 1.5f;
-        Check(Room("서재").Contains(detective) && Room("서재").virtualCamera.activeSelf, "서재 들어가면 서재 카메라로 전환");
+        Check(Room("서재").Contains(sister) && Room("서재").virtualCamera.activeSelf, "서재 들어가면 서재 카메라로 전환");
         Check(!FadeManager.instance.isFading, "페이드 끝남");
 
         // 서재 조사 → 황동 열쇠
-        var interactor = detective.GetComponent<PlayerInteractor3D>();
+        var interactor = sister.GetComponent<PlayerInteractor3D>();
         var area = Object.FindFirstObjectByType<InspectionArea>();
         interactor.Enter(area);
         yield return 0.3f;
@@ -169,7 +173,7 @@ public static class PrototypeSceneValidator
         Check(manager.inputLocked, "조사 중 캐릭터 전환 잠금");
         interactor.Select(area.Items.First(i => i.Title == "황동 열쇠"));
         interactor.CollectSelected();
-        Check(detective.GetComponent<Inventory>().HasItem("황동 열쇠"), "조사로 얻은 열쇠가 탐정 인벤토리에 들어감");
+        Check(sister.GetComponent<Inventory>().HasItem("황동 열쇠"), "조사로 얻은 열쇠가 여동생 인벤토리에 들어감");
         yield return 0.8f;
         interactor.Back();
         yield return 1.2f;
@@ -178,53 +182,55 @@ public static class PrototypeSceneValidator
         Check(integration.CurrentObjective().completeWhenDoorOpen == storageDoor, "목표가 '창고 문 열기'로 진행");
 
         // 특정 구역만 아이소메트릭
-        detective.GetComponent<NavMeshAgent>().Warp(new Vector3(6.5f, 0f, -4f));
+        sister.GetComponent<NavMeshAgent>().Warp(new Vector3(6.5f, 0f, -4f));
         yield return 1.5f;
         Check(Room("계단 복도").virtualCamera.activeSelf && Mathf.Abs(Mathf.DeltaAngle(Camera.main.transform.eulerAngles.y, 45f)) < 1f,
             "계단 복도는 아이소메트릭 시점");
-        detective.GetComponent<NavMeshAgent>().Warp(new Vector3(8.1f, 0f, 2.2f));
+        sister.GetComponent<NavMeshAgent>().Warp(new Vector3(8.1f, 0f, 2.2f));
         yield return 1.5f;
         Check(Mathf.Abs(Mathf.DeltaAngle(Camera.main.transform.eulerAngles.y, 0f)) < 1f, "서재로 돌아오면 다시 탑뷰");
 
         // 창고 문 (열쇠 필요)
-        storageDoor.Interact(assistant.GetComponent<Inventory>());
+        storageDoor.Interact(brother.GetComponent<Inventory>());
         yield return 0.8f;
-        Check(!storageDoor.IsOpen, "열쇠 없는 조수는 창고 문을 못 엶");
+        Check(!storageDoor.IsOpen, "열쇠 없는 오빠는 창고 문을 못 엶");
         Check(DialogueManager.instance.IsShowing && DialogueManager.instance.bodyText.text.StartsWith("굳게"), "잠긴 문 메시지가 대사 패널에 타이핑됨");
-        storageDoor.Interact(detective.GetComponent<Inventory>());
+        storageDoor.Interact(sister.GetComponent<Inventory>());
         yield return 1f;
-        Check(storageDoor.IsOpen, "열쇠 가진 탐정은 창고 문을 엶");
+        Check(storageDoor.IsOpen, "열쇠 가진 여동생은 창고 문을 엶");
 
         // 캐릭터 전환
         typeof(CharacterManager).GetMethod("SwitchPlayer", BindingFlags.NonPublic | BindingFlags.Instance).Invoke(manager, new object[] { 1 });
         yield return 0.3f;
-        Check(manager.GetActivePlayer() == assistant, "조수로 전환");
-        Check(assistant.GetComponent<PlayerInteractor3D>().enabled && !detective.GetComponent<PlayerInteractor3D>().enabled, "전환 후 조사 입력도 조수에게");
+        Check(manager.GetActivePlayer() == brother, "오빠로 전환");
+        Check(brother.GetComponent<PlayerInteractor3D>().enabled && !sister.GetComponent<PlayerInteractor3D>().enabled, "전환 후 조사 입력도 오빠에게");
 
-        // 창고 → 공구 상자 (조수만)
+        // 창고 → 공구 상자 (오빠만)
         Vector3 storageInside = new Vector3(-4.6f, 0f, 6.2f), foyer = new Vector3(0f, 0f, 5.2f);
         var storagePath = new NavMeshPath();
         NavMesh.CalculatePath(foyer, storageInside, NavMesh.AllAreas, storagePath);
         Check(storagePath.status == NavMeshPathStatus.PathComplete, "창고 문이 열린 뒤 창고까지 걸어갈 수 있음");
         var box = Object.FindObjectsByType<InteractableItem>(FindObjectsSortMode.None).First(i => i.itemName == "공구 상자");
-        Check(box.requiredCharacter == CharacterType.Player2, "공구 상자는 조수 전용");
-        box.PickUp(assistant.GetComponent<Inventory>());
+        Check(box.requiredTrait == CharacterTrait.Strength && box.CanPickUp(CharacterType.Player2) && !box.CanPickUp(CharacterType.Player1),
+            "공구 상자는 힘 특성(오빠)만 들 수 있음");
+        box.PickUp(brother.GetComponent<Inventory>());
         yield return 0.2f;
 
         // 다용도실 문 (공구 필요)
         var pantryPath = new NavMeshPath();
         NavMesh.CalculatePath(new Vector3(-3f, 0f, -0.2f), new Vector3(-6.5f, 0f, -0.2f), NavMesh.AllAreas, pantryPath);
         Check(pantryPath.status != NavMeshPathStatus.PathComplete, "닫힌 다용도실 문은 길을 막음");
-        pantryDoor.Interact(assistant.GetComponent<Inventory>());
+        pantryDoor.Interact(brother.GetComponent<Inventory>());
         yield return 1.2f;
-        Check(pantryDoor.IsOpen, "공구 가진 조수가 다용도실 문을 엶");
+        Check(pantryDoor.IsOpen, "공구 가진 오빠가 다용도실 문을 엶");
         NavMesh.CalculatePath(new Vector3(-3f, 0f, -0.2f), new Vector3(-6.5f, 0f, -0.2f), NavMesh.AllAreas, pantryPath);
         Check(pantryPath.status == NavMeshPathStatus.PathComplete, "다용도실 문이 열린 뒤 걸어갈 수 있음");
 
-        // 암호 메모 (탐정만) → 목표 달성
+        // 암호 메모 (여동생만) → 목표 달성
         var memo = Object.FindObjectsByType<InteractableItem>(FindObjectsSortMode.None).First(i => i.itemName == "암호 메모");
-        Check(memo.requiredCharacter == CharacterType.Player1, "암호 메모는 탐정 전용");
-        memo.PickUp(detective.GetComponent<Inventory>());
+        Check(memo.requiredTrait == CharacterTrait.Investigation && memo.CanPickUp(CharacterType.Player1) && !memo.CanPickUp(CharacterType.Player2),
+            "암호 메모는 정보 수집 특성(여동생)만 읽을 수 있음");
+        memo.PickUp(sister.GetComponent<Inventory>());
         yield return 0.3f;
         Check(integration.CurrentObjective() == null, "모든 목표 완료");
     }

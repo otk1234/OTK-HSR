@@ -3,7 +3,7 @@ using UnityEngine;
 
 // 사건 하나의 추리 문제 (기획이 고치는 데이터). 질문마다 선택지를 고르고, 한 번 답하면 바꿀 수 없음.
 //  - 선택지는 필요한 단서(needAnyClue 중 하나라도)를 사건 파일에 모아야 고를 수 있음. 비워 두면 언제나 고를 수 있음 (오답 함정 등)
-//  - onlyFor: 그 캐릭터가 추리할 때만 보이는 선택지 → 같은 결론이라도 여동생·오빠가 서로 다른 근거로 도달할 수 있음
+//  - onlyForTrait: 그 특성이 있는 캐릭터가 추리할 때만 보이는 선택지 → 같은 결론이라도 여동생·오빠가 서로 다른 근거로 도달할 수 있음
 //  - 틀려도 진행은 막지 않음. 결과는 CaseState에 남아 다음 사건에 영향 (오답이면 큰 패널티)
 [CreateAssetMenu(menuName = "OTK/사건 추리", fileName = "CaseDeduction")]
 public class CaseDeduction : ScriptableObject
@@ -14,9 +14,10 @@ public class CaseDeduction : ScriptableObject
         [TextArea] public string text;
         public bool correct;
         public string[] needAnyClue = new string[0];
-        public CharacterType onlyFor = CharacterType.All;
+        public CharacterTrait onlyForTrait = CharacterTrait.None; // 이 특성이 있는 캐릭터에게만 보임
+        public CharacterType onlyFor = CharacterType.All;         // (예전 방식) 이 캐릭터에게만 보임
 
-        public bool VisibleTo(CharacterType who) => onlyFor == CharacterType.All || onlyFor == who;
+        public bool VisibleTo(CharacterType who) => CharacterRoster.CanUse(who, onlyFor, onlyForTrait);
 
         public bool Unlocked
         {
@@ -77,7 +78,7 @@ public class CaseDeduction : ScriptableObject
                 options = new[]
                 {
                     new Option { text = "아파트 경비원." },
-                    new Option { text = "아빠다. 손톱 밑 섬유가 아빠의 남색 외투와 같다.", correct = true, needAnyClue = new[] { "navy_fiber" }, onlyFor = CharacterType.Player1 },
+                    new Option { text = "아빠다. 손톱 밑 섬유가 아빠의 남색 외투와 같다.", correct = true, needAnyClue = new[] { "navy_fiber" }, onlyForTrait = CharacterTrait.Investigation },
                     new Option { text = "아빠다. 녹화 영상 속 걸음걸이가 아빠다.", correct = true, needAnyClue = new[] { "intercom_video" } },
                     new Option { text = "피해자의 다른 지인." },
                 },

@@ -3,7 +3,7 @@ using UnityEngine;
 public enum InterventionKind { Incite, Abet, Prevent } // 종용 · 가담 · 막기
 
 // 범행 현장의 개입 지점. 이번 사건의 방향(InterventionPlanner에서 남매가 정함)과 같은 종류만 쓸 수 있고, 사건마다 한 번.
-// 누구나 할 수 있지만 걸리는 시간은 캐릭터 능력에 따라 다름 (예: 시체 치우기는 오빠가 빠르고 여동생은 오래 걸림).
+// 누구나 할 수 있지만 걸리는 시간은 캐릭터 특성에 따라 다름 (예: 시체 치우기는 힘 특성(오빠)이 빠르고 여동생은 오래 걸림).
 // 끝나면 죄책감 기록 + CaseState에 개입 기록 + 지정한 오브젝트를 숨김(치운 시체 등).
 public class Intervention : CharacterInteractable
 {
@@ -19,9 +19,10 @@ public class Intervention : CharacterInteractable
     [Header("무슨 일을 했는지 (기록·로그용)")]
     [TextArea] public string summary;
 
-    [Header("걸리는 시간 (초): 여동생 / 오빠")]
-    public float sisterTime = 3f;
-    public float brotherTime = 3f;
+    [Header("걸리는 시간 (초): 이 특성이 있으면 skilledTime, 없으면 otherTime")]
+    public CharacterTrait skilledTrait = CharacterTrait.None;
+    public float skilledTime = 3f;
+    public float otherTime = 3f;
 
     [Header("죄책감 행동 ID (GuiltActions)")]
     public string guiltActionId;
@@ -41,9 +42,10 @@ public class Intervention : CharacterInteractable
         !Done && CaseState.TryGetDirection(caseId, out InterventionKind direction) && direction == kind && !CaseState.HasIntervened(caseId);
 
     protected override string ActionLabel => actionLabel;
-    protected override float WorkTime => sisterTime;
+    protected override float WorkTime => otherTime;
 
-    public override float WorkTimeFor(CharacterType who) => who == CharacterType.Player2 ? brotherTime : sisterTime;
+    public override float WorkTimeFor(CharacterType who) =>
+        skilledTrait != CharacterTrait.None && CharacterRoster.Has(who, skilledTrait) ? skilledTime : otherTime;
 
     protected override void OnWorkDone(PlayerInteraction user)
     {

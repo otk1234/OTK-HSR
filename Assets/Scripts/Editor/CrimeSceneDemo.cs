@@ -285,12 +285,12 @@ public static class CrimeSceneDemo
         yield return 4.5f;
 
         var hideBody = Object.FindObjectsByType<Intervention>(FindObjectsSortMode.None).First(i => i.kind == InterventionKind.Abet);
-        Say($"⑦ 누구나 할 수 있지만 <b>능력에 따라 시간이 다름</b>: 시체 옮기기는\n오빠 {hideBody.brotherTime}초 · 여동생 {hideBody.sisterTime}초. 오빠가 옮깁니다.");
+        Say($"⑦ 누구나 할 수 있지만 <b>능력에 따라 시간이 다름</b>: 시체 옮기기는\n오빠 {hideBody.WorkTimeFor(CharacterType.Player2)}초 · 여동생 {hideBody.WorkTimeFor(CharacterType.Player1)}초. 오빠가 옮깁니다.");
         brother.GetComponent<NavMeshAgent>().Warp(new Vector3(-3.6f, 0f, -2.3f));
         manager.SwitchInstant(1);
         yield return 2f;
         hideBody.Use(brotherHands);
-        yield return hideBody.brotherTime + 1.5f;
+        yield return hideBody.WorkTimeFor(CharacterType.Player2) + 1.5f;
         Say($"⑦ 가담 → <b>죄책감 +8</b> (지금 {GuiltSystem.Value}, {GuiltSystem.TierName}). 개입 결과도 다음 사건으로 넘겨집니다.\n(변동폭은 챕터가 많으므로 작게: 종용 +5 · 가담 +8 · 막기 −5)");
         yield return 6f;
 

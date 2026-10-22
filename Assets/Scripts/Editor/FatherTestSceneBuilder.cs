@@ -169,8 +169,8 @@ public static class FatherTestSceneBuilder
             B.Hide(hiding, "세탁실 수납장", HidingKind.Closet, new Vector3(7f, 0f, -7.9f));
 
             // 6) 캐릭터 2명 (서로 떨어진 방에서 시작: 조작하지 않는 캐릭터도 노려지는지 보기 좋도록)
-            GameObject detective = B.BuildPlayer("탐정 (Player1)", CharacterType.Player1, new Vector3(6f, 1f, 4.5f), Color.white);
-            GameObject assistant = B.BuildPlayer("조수 (Player2)", CharacterType.Player2, new Vector3(-7f, 1f, -5f), new Color(0.65f, 0.82f, 1f));
+            GameObject sister = B.BuildPlayer(B.PlayerName(CharacterType.Player1), CharacterType.Player1, new Vector3(6f, 1f, 4.5f), Color.white);
+            GameObject brother = B.BuildPlayer(B.PlayerName(CharacterType.Player2), CharacterType.Player2, new Vector3(-7f, 1f, -5f), new Color(0.65f, 0.82f, 1f));
 
             // 7) 아버지 (중앙 홀에서 시작)
             BuildFather(new Vector3(0f, 1f, -1.2f));
@@ -178,7 +178,7 @@ public static class FatherTestSceneBuilder
             // 8) 시스템
             PrototypeSceneBuilder.BuildFadeCanvas();
             var systems = new GameObject("Game Systems");
-            systems.AddComponent<CharacterManager>().players = new[] { detective, assistant };
+            systems.AddComponent<CharacterManager>().players = new[] { sister, brother };
             systems.AddComponent<GameStateManager>();
             systems.AddComponent<RoomCameraSync>();
             systems.AddComponent<ChaseDebugOverlay>();

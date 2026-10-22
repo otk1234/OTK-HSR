@@ -30,9 +30,6 @@ public class PrototypeIntegration : MonoBehaviour
         }
     }
 
-    [Header("캐릭터 표시 이름 (CharacterManager.players 순서)")]
-    public string[] characterNames = { "탐정", "조수" };
-
     [Header("팀원 그레이박스 쪽")]
     public SimpleGameHud hud;
     public IsometricCameraFollow inspectionCamera; // 조사할 때 클로즈업 연출
@@ -41,10 +38,6 @@ public class PrototypeIntegration : MonoBehaviour
     [Header("내 시스템 쪽")]
     public CinemachineBrain cameraBrain;            // 평소 화면은 구역별 고정 카메라(탑뷰/아이소메트릭)가 담당
     public DialogueManager dialogue;                // 독백·단서 문구 (없으면 HUD 알림으로 표시)
-
-    [Header("소지품 칸 수 (HUD 표시와 같게)")]
-    public int inventorySize = 5;
-    private bool useSiblingCharacterRules;
 
     [Header("진행 목표 (위에서부터 순서대로)")]
     public Objective[] objectives;
@@ -211,23 +204,14 @@ public class PrototypeIntegration : MonoBehaviour
 
     public bool OverviewFollowEnabled => overviewFollowEnabled;
 
-    // 기획 참고용 남매 규칙: 0번 여동생, 1번 오빠. 오빠는 기본보다 소지품을 한 칸 더 사용합니다.
-    // (칸 수는 임시 — 6.2 캐릭터 프로필로 옮길 예정)
-    public void EnableSiblingCharacterRules()
-    {
-        useSiblingCharacterRules = true;
-        characterNames = new[] { "여동생", "오빠" };
-    }
+    // 표시 이름·소지품 칸 수는 캐릭터 프로필에서 (CharacterManager.players 순서)
+    public string NameFor(int playerIndex) => CharacterRoster.NameOf(Players[playerIndex]);
 
-    public int InventoryCapacityFor(int playerIndex)
-    {
-        return inventorySize + (useSiblingCharacterRules && playerIndex == 1 ? 1 : 0);
-    }
+    public int InventoryCapacityFor(int playerIndex) => Players[playerIndex].GetComponent<Inventory>().Capacity;
 
     void SyncHud(GameObject active)
     {
-        int index = CharacterManager.instance.ActivePlayerIndex;
-        hud.SetCharacter(index < characterNames.Length ? characterNames[index] : active.name);
+        hud.SetCharacter(CharacterRoster.NameOf(active));
         hud.SetInventory(active.GetComponent<Inventory>().items);
 
         // 구역이 겹치면(복도 안의 손님방 등) 더 작은 구역 이름을 씁니다.
@@ -286,11 +270,7 @@ public class PrototypeIntegration : MonoBehaviour
     // 조사로 얻은 아이템(황동 열쇠 등)은 조작 중인 캐릭터의 인벤토리로 들어갑니다.
     bool AddToActiveInventory(string itemName)
     {
-        Inventory inventory = CharacterManager.instance.GetActivePlayer().GetComponent<Inventory>();
-        int capacity = InventoryCapacityFor(CharacterManager.instance.ActivePlayerIndex);
-        if (inventory.items.Count >= capacity) return false;
-        inventory.AddItem(itemName);
-        return true;
+        return CharacterManager.instance.GetActivePlayer().GetComponent<Inventory>().TryAddItem(itemName);
     }
 
     public Objective CurrentObjective()
@@ -305,8 +285,7 @@ public class PrototypeIntegration : MonoBehaviour
     {
         if (dialogue != null)
         {
-            int index = CharacterManager.instance.ActivePlayerIndex;
-            dialogue.Say(index < characterNames.Length ? characterNames[index] : "", message, hint);
+            dialogue.Say(CharacterRoster.NameOf(CharacterManager.instance.GetActivePlayer()), message, hint);
         }
         else if (hud != null) hud.ShowMessage(message);
     }
