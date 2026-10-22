@@ -279,7 +279,7 @@ public static class FatherTestSceneBuilder
         var motor = chaser.AddComponent<ChaserMotor>();
         motor.chaserType = ChaserType.Father;
         motor.walkSpeed = 2.0f;   // 경찰보다 조금 느리지만 머리를 씀
-        motor.runSpeed = 4.4f;
+        motor.runSpeed = 4.1f;   // 플레이어 달리기 5.6: 스태미나를 잘 쓰면 따돌릴 수 있도록
 
         var senses = chaser.AddComponent<ChaserSenses>();
         senses.viewDistance = 10f;

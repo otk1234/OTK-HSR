@@ -4387,7 +4387,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ChaserMotor
   chaserType: 2
   walkSpeed: 2
-  runSpeed: 4.4
+  runSpeed: 4.1
   doorOpenWait: 0.6
   quiet: 0
   quietNoiseScale: 0.35

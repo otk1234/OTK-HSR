@@ -136,7 +136,7 @@ public class EntryPoint : MonoBehaviour
         }
     }
 
-    static bool IsLinkSegment(Vector3 a, Vector3 b, EntryPoint entry)
+    internal static bool IsLinkSegment(Vector3 a, Vector3 b, EntryPoint entry)
     {
         const float tolerance = 0.6f;
         bool forward = Flat(a - entry.PointA) < tolerance && Flat(b - entry.PointB) < tolerance;

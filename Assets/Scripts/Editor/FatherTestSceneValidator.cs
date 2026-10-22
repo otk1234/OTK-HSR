@@ -181,7 +181,11 @@ public static class FatherTestSceneValidator
         void ForgetAll() { senses.Forget(p1); senses.Forget(p2); }
         IEnumerable<float> SetLock(EntryPoint door, bool locked)
         {
-            if (door.door.IsOpen) { door.door.Interact(inventory1); yield return 1f; }
+            // 멈춘 아버지가 문을 지나는 중이었으면 그 동작이 끝난 뒤 완전히 세움 (안 그러면 문을 다시 열고 지나감)
+            for (int i = 0; i < 30 && motor.IsTraversing; i++) yield return 0.1f;
+            if (!father.enabled) motor.Stop();
+            for (int i = 0; i < 20 && door.door.IsMoving; i++) yield return 0.1f; // 움직이는 중이면 닫기가 무시됨
+            if (door.door.IsOpen && !door.door.IsBroken) { door.door.Interact(inventory1); yield return 1f; }
             if (door.door.IsLocked != locked) door.door.ToggleLock(inventory1);
             yield return 0.1f;
         }
@@ -202,6 +206,10 @@ public static class FatherTestSceneValidator
         Check(motor.chaserType == ChaserType.Father && motor.Agent.areaMask == fatherMask, "아버지는 창문·환풍구를 쓸 수 있는 길찾기");
         Check(defaultChance > 0f && defaultChance <= 0.25f && defaultCooldown >= 30f && father.intuitionStartDelay >= 15f,
             $"직감 기본값은 낮은 확률·긴 대기 ({defaultChance:P0}, {defaultCooldown:0}초마다 최대 1번, 시작 후 {father.intuitionStartDelay:0}초 동안 없음)");
+        float playerRun = move1.moveSpeed * move1.runSpeedMultiplier;
+        Check(motor.runSpeed < playerRun - 1f, $"아버지 달리기({motor.runSpeed:0.0})는 플레이어 달리기({playerRun:0.0})보다 확실히 느림");
+        Check(father.loseSightHesitation >= 1f && father.hidingNoiseCertainty > 0f && father.hidingNoiseCertainty < 1f && father.maxSpotsToSearch == 2,
+            $"난이도 기본값: 놓친 뒤 망설임 {father.loseSightHesitation:0.0}초, 쫓는 중 숨는 소리 확신 {father.hidingNoiseCertainty:P0}, 뒤지는 숨는 곳 {father.maxSpotsToSearch}곳");
 
         // ---- 맵 동선: 북쪽 방 3개의 잠긴 문 대처가 서로 다르게 ----
         Vector3 hall = new Vector3(0f, 0f, -1.5f);
@@ -270,16 +278,161 @@ public static class FatherTestSceneValidator
         move1.scriptedRun = false;
         float lastSeenX = p1.transform.position.x;
         Place(p1, new Vector3(-2f, 0f, 5f));               // 갑자기 시야에서 사라짐 (잠긴 안방 안)
-        for (waited = 0f; waited < 4f && father.Current != FatherAI.Mode.Intercept; waited += 0.1f) yield return 0.1f;
+        yield return 0.15f;
+        Vector3 lostAt = father.transform.position;
+        Check(father.IsHesitating, $"놓친 직후에는 제자리에서 두리번거림 (상태 {father.StateLabel})");
+        yield return father.loseSightHesitation * 0.6f;
+        Check(father.IsHesitating && Flat(father.transform.position, lostAt) < 0.3f, $"망설이는 동안({father.loseSightHesitation:0.0}초)은 움직이지 않음");
+        for (waited = 0f; waited < 5f && father.Current != FatherAI.Mode.Intercept; waited += 0.1f) yield return 0.1f;
         Check(father.Current == FatherAI.Mode.Intercept && father.HasPrediction && father.PredictedPoint.x > lastSeenX + 1.5f,
             $"놓치면 마지막 위치를 지나 움직이던 방향(동쪽)으로 앞질러 감 (마지막 x {lastSeenX:0.0} → 예측 x {father.PredictedPoint.x:0.0}, 상태 {father.StateLabel})");
         for (waited = 0f; waited < father.interceptTimeout + 4f && father.Current == FatherAI.Mode.Intercept; waited += 0.2f) yield return 0.2f;
         Check(father.Current == FatherAI.Mode.SearchSpots || father.Current == FatherAI.Mode.Search, $"예측한 곳에도 없으면 수색 (상태 {father.StateLabel})");
-        for (waited = 0f; waited < father.searchTime + 12f && father.Current != FatherAI.Mode.Prowl; waited += 0.2f) yield return 0.2f;
+
+        // 쫓는 중에 들은 숨는 소리: 확률로만 그곳을 확실히 뒤짐
+        for (waited = 0f; waited < 10f && father.Current != FatherAI.Mode.Search; waited += 0.1f) yield return 0.1f;
+        HidingSpot laundryCloset = Spot("세탁실 수납장");
+        float certainty = father.hidingNoiseCertainty;
+        father.hidingNoiseCertainty = 0f;
+        NoiseSystem.Emit(laundryCloset.transform.position, 20f, NoiseKind.Hiding, p1.gameObject);
+        Check(father.Current == FatherAI.Mode.Search, $"수색 중 숨는 소리, 확률이 빗나가면: 그쪽을 평소처럼 수색 (상태 {father.StateLabel})");
+        father.hidingNoiseCertainty = 1f;
+        NoiseSystem.Emit(laundryCloset.transform.position, 20f, NoiseKind.Hiding, p1.gameObject);
+        Check(father.Current == FatherAI.Mode.SearchSpots && father.SpotBeingChecked == laundryCloset,
+            $"확률이 맞으면: 그 숨는 곳(세탁실 수납장)을 바로 뒤지러 감 (상태 {father.StateLabel})");
+        father.hidingNoiseCertainty = certainty;
+        for (waited = 0f; waited < father.searchTime + 30f && father.Current != FatherAI.Mode.Prowl; waited += 0.2f) yield return 0.2f;
         Check(father.Current == FatherAI.Mode.Prowl, $"수색해도 없으면 포기하고 배회 ({waited:0.0}초)");
         yield return game.chaseEndDelay + 0.3f;
         Check(!GameStateManager.IsChase && !p1.IsCaught, "포기하면 추리 상태로");
         Freeze();
+
+        // ==== 3-2 잠긴 문 판단 ====
+        // 판단 확률 (계산만)
+        var rngCheck = new System.Random(99);
+        var weights = new FatherTactics.DoorWeights { detour = father.detourWeight, feign = father.feignWeight, ambush = father.ambushWeight };
+        Dictionary<DoorTactic, float> Share(FatherTactics.DoorSituation situation)
+        {
+            var counts = new Dictionary<DoorTactic, float>();
+            foreach (DoorTactic t in Enum.GetValues(typeof(DoorTactic))) counts[t] = 0f;
+            for (int i = 0; i < 4000; i++) counts[FatherTactics.Choose(situation, weights, rngCheck)] += 1f / 4000f;
+            return counts;
+        }
+        var near = Share(new FatherTactics.DoorSituation { detourAvailable = true, detourExtra = 4f, hasWeapon = true, breakable = true });
+        Check(Mathf.Abs(near[DoorTactic.Detour] - 0.45f) < 0.04f && Mathf.Abs(near[DoorTactic.FeignRetreat] - 0.25f) < 0.04f && Mathf.Abs(near[DoorTactic.Ambush] - 0.30f) < 0.04f && near[DoorTactic.Bash] == 0f,
+            $"우회로가 가까우면 우회 {near[DoorTactic.Detour]:P0} · 위장 후퇴 {near[DoorTactic.FeignRetreat]:P0} · 잠복 {near[DoorTactic.Ambush]:P0}, 무기가 있어도 파괴 안 함");
+        var far = Share(new FatherTactics.DoorSituation { detourAvailable = true, detourExtra = 45f, hasWeapon = false, breakable = true });
+        Check(far[DoorTactic.Detour] < near[DoorTactic.Detour] - 0.15f, $"우회로가 멀면(+45m) 우회를 덜 고름 ({far[DoorTactic.Detour]:P0})");
+        var none = Share(new FatherTactics.DoorSituation { detourAvailable = false, hasWeapon = false, breakable = true });
+        Check(none[DoorTactic.Detour] == 0f && none[DoorTactic.Bash] == 0f && none[DoorTactic.FeignRetreat] > 0.3f && none[DoorTactic.Ambush] > 0.4f,
+            $"우회로 없음 + 무기 없음: 위장 후퇴 {none[DoorTactic.FeignRetreat]:P0} · 잠복 {none[DoorTactic.Ambush]:P0} (우회·파괴 없음)");
+        var armed = Share(new FatherTactics.DoorSituation { detourAvailable = false, hasWeapon = true, breakable = true });
+        Check(armed[DoorTactic.Bash] > 0.999f, "우회로 없음 + 무기 있음: 최후의 수단으로 항상 파괴");
+
+        // 장면 준비: 두 캐릭터는 잠긴 안방, 아이방 문 잠금. 아버지는 서쪽 복도 (아이방 문이 환풍구보다 확실히 가까운 쪽)
+        EntryPoint kidDoor = Entry("아이방 문"), masterDoor = Entry("안방 문");
+        foreach (float s in SetLock(kidDoor, true)) yield return s;
+        Vector3 westHall = new Vector3(-11f, 0f, -1.5f), kidInside = new Vector3(-10f, 0f, 5f);
+        Check(FatherTactics.LockedDoorOnRoute(westHall, kidInside, fatherMask, out float viaDoor, out float viaVent) == kidDoor && viaVent > viaDoor + 2f,
+            $"준비: 서쪽 복도 → 아이방 안쪽은 잠긴 아이방 문이 지름길 (문 {viaDoor:0.0}m / 환풍구 {viaVent:0.0}m)");
+        Vector3 DoorMid(EntryPoint e) => (e.PointA + e.PointB) * 0.5f;
+        IEnumerable<float> SendFatherToKidRoom(DoorTactic tactic)
+        {
+            Place(father, westHall, 0f);
+            father.forceDoorTactic = tactic;
+            father.enabled = true;
+            father.StandStill(1f);
+            ForgetAll();
+            yield return 0.1f;
+            NoiseSystem.Emit(kidInside, 20f, NoiseKind.Run, p1.gameObject); // 아이방 안에서 소리 (탐정은 실제로는 안방에 있음)
+            yield return 0.1f;
+            Check(kidDoor.door.IsLocked && RoomOf(father) == "서쪽 복도",
+                $"준비({tactic}): 아이방 문 잠김, 아버지는 서쪽 복도 (문 {kidDoor.door.State}, 아버지 {RoomOf(father)}, {father.StateLabel})");
+        }
+
+        // 문 확인 → 잠복 → 문이 열리면 들이닥침
+        foreach (float s in SendFatherToKidRoom(DoorTactic.Ambush)) yield return s;
+        bool sawApproach = false;
+        for (waited = 0f; waited < 15f && father.Current != FatherAI.Mode.Ambush; waited += 0.1f)
+        {
+            sawApproach |= father.Current == FatherAI.Mode.DoorApproach && father.DoorTarget == kidDoor;
+            yield return 0.1f;
+        }
+        Check(sawApproach, "가는 길이 잠긴 문을 지나면, 길찾기로 바로 돌아가지 않고 먼저 문 앞에서 손잡이를 확인");
+        for (waited = 0f; waited < 6f && Flat(father.transform.position, DoorMid(kidDoor)) > 2.2f; waited += 0.1f) yield return 0.1f;
+        yield return 1.5f;
+        Check(father.Current == FatherAI.Mode.Ambush && father.IsSneaking && Flat(father.transform.position, DoorMid(kidDoor)) < 2.2f && kidDoor.door.IsLocked,
+            $"잠복: 문 옆에서 조용히 기다림 (문까지 {Flat(father.transform.position, DoorMid(kidDoor)):0.0}m, 상태 {father.StateLabel})");
+        foreach (float s in SetLock(kidDoor, false)) yield return s;  // 떠난 줄 알고 문을 엶
+        for (waited = 0f; waited < 8f && RoomOf(father) != "아이방"; waited += 0.1f) yield return 0.1f;
+        Check(RoomOf(father) == "아이방", $"잠금이 풀리자 바로 들이닥침 ({waited:0.0}초)");
+        Freeze();
+        foreach (float s in SetLock(kidDoor, true)) yield return s;
+
+        // 우회: 환풍구로 조용히
+        foreach (float s in SendFatherToKidRoom(DoorTactic.Detour)) yield return s;
+        bool sawSneakDetour = false;
+        for (waited = 0f; waited < 25f && RoomOf(father) != "아이방"; waited += 0.1f)
+        {
+            sawSneakDetour |= father.Current == FatherAI.Mode.Detour && father.IsSneaking;
+            yield return 0.1f;
+        }
+        Check(RoomOf(father) == "아이방" && kidDoor.door.IsLocked && sawSneakDetour && father.LastDoorTactic == DoorTactic.Detour && father.LastDetourAvailable,
+            $"우회: 문 대신 환풍구로 조용히 들어감 ({waited:0.0}초)");
+        Freeze();
+
+        // 위장 후퇴: 보란 듯이 멀어졌다가 → 몰래 우회
+        father.feignDetourChance = 1f;
+        foreach (float s in SendFatherToKidRoom(DoorTactic.FeignRetreat)) yield return s;
+        float retreatedTo = 0f;
+        bool loudRetreat = false, sneakAfter = false;
+        for (waited = 0f; waited < 45f && RoomOf(father) != "아이방"; waited += 0.1f)
+        {
+            if (father.Current == FatherAI.Mode.FeignRetreat && !father.IsSneaking)
+            {
+                loudRetreat = true;
+                retreatedTo = Mathf.Max(retreatedTo, Flat(father.transform.position, DoorMid(kidDoor)));
+            }
+            sneakAfter |= loudRetreat && father.Current == FatherAI.Mode.Detour && father.IsSneaking;
+            yield return 0.1f;
+        }
+        Check(loudRetreat && retreatedTo >= 4.5f, $"위장 후퇴: 포기한 척 문에서 {retreatedTo:0.0}m 떨어진 곳까지 걸어감");
+        Check(sneakAfter && RoomOf(father) == "아이방" && kidDoor.door.IsLocked, $"그 뒤 몰래 환풍구로 돌아 들어감 ({waited:0.0}초)");
+        father.feignDetourChance = 0.5f;
+        Freeze();
+        foreach (float s in SetLock(kidDoor, false)) yield return s;
+
+        // 우회로가 없는 안방: 무기 없으면 위장 후퇴·잠복만
+        father.forceDoorTactic = DoorTactic.None;
+        Place(father, hall, 0f);
+        father.enabled = true;
+        father.StandStill(1f);
+        ForgetAll();
+        yield return 0.1f;
+        NoiseSystem.Emit(p1.transform.position, 20f, NoiseKind.Run, p1.gameObject);
+        for (waited = 0f; waited < 15f && father.Current != FatherAI.Mode.FeignRetreat && father.Current != FatherAI.Mode.Ambush; waited += 0.1f) yield return 0.1f;
+        Check((father.Current == FatherAI.Mode.FeignRetreat || father.Current == FatherAI.Mode.Ambush) && !father.LastDetourAvailable && masterDoor.door.IsLocked
+              && masterDoor.door.Durability >= masterDoor.door.maxDurability,
+            $"안방(우회로 없음) + 무기 없음: 문을 부수지 않고 {father.StateLabel}");
+        Freeze();
+
+        // 무기가 있으면: 최후의 수단으로 파괴 (두 캐릭터는 서재로 옮겨 둠)
+        Place(p1, new Vector3(6f, 0f, 4.5f));
+        Place(p2, new Vector3(7f, 0f, 4f));
+        father.hasWeapon = true;
+        Place(father, hall, 0f);
+        father.enabled = true;
+        father.StandStill(1f);
+        ForgetAll();
+        yield return 0.1f;
+        NoiseSystem.Emit(new Vector3(-2f, 0f, 5f), 20f, NoiseKind.Run, p1.gameObject);
+        for (waited = 0f; waited < 20f && !masterDoor.door.IsBroken; waited += 0.2f) yield return 0.2f;
+        Check(father.LastDoorTactic == DoorTactic.Bash && masterDoor.door.IsBroken, $"안방 + 무기 있음: 문을 부숨 ({waited:0.0}초)");
+        for (waited = 0f; waited < 8f && RoomOf(father) != "안방"; waited += 0.2f) yield return 0.2f;
+        Check(RoomOf(father) == "안방", "부순 문으로 들어가 확인");
+        father.hasWeapon = false;
+        Freeze();
+        yield return game.chaseEndDelay + 0.3f;
 
         // ---- 직감: 숨지 않은 캐릭터가 있는 방으로 → 조작하지 않는 캐릭터도 노림 ----
         foreach (float s in SetLock(Entry("안방 문"), false)) yield return s;

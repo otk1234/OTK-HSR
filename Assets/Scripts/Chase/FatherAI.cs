@@ -4,15 +4,18 @@ using UnityEngine.AI;
 
 // 아버지 AI (고지능 추격자)
 //  배회(자주 보인 방·직감) → 조사(소리·흘끗 봄) → 추격(발견)
-//  → 놓침: 마지막으로 본 곳 → 움직이던 방향을 예측해 앞질러 감 → 숨는 곳 확률 수색 → 주변 수색 → 포기
+//  → 놓침: 잠깐 두리번 → 마지막으로 본 곳 → 움직이던 방향을 예측해 앞질러 감 → 숨는 곳 확률 수색 → 주변 수색 → 포기
 //  - 창문·환풍구 사용 (ChaserMotor ChaserType.Father). 잠긴 문 너머에 다른 길이 있으면 길찾기가 그쪽으로 돌아감
 //  - 직감: 가끔(낮은 확률 + 대기 시간) 숨지 않은 캐릭터가 있는 방 쪽으로 배회 → 조작하지 않는 캐릭터도 노림.
 //    방까지만 향하고 정확한 위치는 모름 (보거나 들어야 알아챔)
-//  - 숨는 소리를 들으면 그 숨는 곳을 뒤짐. 숨는 장면을 봤으면 그곳부터 뒤짐
+//  - 숨는 소리를 들으면 그 숨는 곳을 뒤짐 (쫓는 중에는 확률로만). 숨는 장면을 봤으면 그곳부터 뒤짐
+//  - 잠긴 문: 쫓거나 조사하러 가는 가장 짧은 길이 잠긴 문을 지나면, 문 앞에서 손잡이를 돌려 보고 판단
+//    (배회 중에는 판단하지 않음). 우회로가 없고 무기가 있으면 파괴(최후의 수단), 그 밖에는 확률로
+//    우회(창문·환풍구, 조용히) / 위장 후퇴(보란 듯이 떠났다가 몰래 우회하거나 돌아와 잠복) / 잠복(문 옆에서 조용히 대기)
 [RequireComponent(typeof(ChaserMotor), typeof(ChaserSenses))]
 public class FatherAI : MonoBehaviour, IChaserBrain
 {
-    public enum Mode { Prowl, Investigate, Chase, Pursue, Intercept, SearchSpots, Search }
+    public enum Mode { Prowl, Investigate, Chase, Pursue, Intercept, SearchSpots, Search, DoorApproach, Detour, FeignRetreat, Ambush, Bash }
 
     [Header("배회")]
     public float prowlPause = 1.5f;
@@ -36,6 +39,14 @@ public class FatherAI : MonoBehaviour, IChaserBrain
     [Tooltip("추격 중 이 간격마다 '캐릭터를 본 장소'로 기억")]
     public float sightingInterval = 3f;
 
+    [Header("놓친 뒤: 망설임")]
+    [Tooltip("시야에서 놓친 직후 제자리에서 두리번거리는 시간 (그 사이 숨을 틈)")]
+    public float loseSightHesitation = 1.2f;
+
+    [Header("쫓는 중 숨는 소리")]
+    [Tooltip("추격·수색 중 숨는 소리를 들었을 때 그 숨는 곳을 확실히 뒤질 확률. 아니면 소리 난 쪽으로 가서 평소처럼 수색 (배회 중에 들은 소리는 항상 확인)")]
+    [Range(0f, 1f)] public float hidingNoiseCertainty = 0.5f;
+
     [Header("놓친 뒤: 예측")]
     [Tooltip("마지막으로 본 움직임 방향으로 이만큼 앞을 예측 (벽에 막히면 그 앞까지)")]
     public float predictDistance = 7f;
@@ -55,9 +66,41 @@ public class FatherAI : MonoBehaviour, IChaserBrain
     public float searchRadius = 4f;
     public float searchPointPause = 0.8f;
 
+    [Header("잠긴 문 판단")]
+    [Tooltip("문 앞에서 손잡이를 돌려 보며 잠긴 걸 확인하는 시간")]
+    public float doorCheckTime = 0.8f;
+    [Tooltip("판단 가중치 (우회는 우회로가 멀수록 줄어듦: 10m 더 → 그대로, 40m 이상 더 → 40%)")]
+    public float detourWeight = 45f;
+    public float feignWeight = 25f;
+    public float ambushWeight = 30f;
+    [Tooltip("한 번 판단한 문은 이 시간 동안 다시 판단하지 않음")]
+    public float doorDecisionMemory = 20f;
+
+    [Header("잠긴 문: 위장 후퇴")]
+    [Tooltip("문에서 이만큼 떨어진 곳까지 보란 듯이 걸어감")]
+    public float feignDistance = 7f;
+    [Tooltip("포기한 척 서 있는 시간")]
+    public float feignPause = 2.5f;
+    [Tooltip("그 뒤 우회로가 있으면 몰래 우회할 확률 (아니면 몰래 돌아와 잠복)")]
+    [Range(0f, 1f)] public float feignDetourChance = 0.5f;
+
+    [Header("잠긴 문: 잠복")]
+    public float ambushTime = 12f;
+    [Tooltip("문 너머에서 소리가 나면 기다리는 시간이 늘어나지만 이 시간을 넘지 않음")]
+    public float ambushMaxTime = 25f;
+
+    [Header("잠긴 문: 파괴 (무기가 있을 때만, 우회로가 없을 때 최후의 수단)")]
+    [Tooltip("테스트용 체크박스 (획득 방식은 나중에)")]
+    public bool hasWeapon;
+    public float bashDamage = 25f;
+    public float bashInterval = 1.2f;
+    public float bashGiveUpTime = 20f;
+
     [Header("점검·디버그")]
     [Tooltip("0이 아니면 이 값으로 무작위 판단을 고정 (점검용)")]
     public int randomSeed;
+    [Tooltip("None이 아니면 잠긴 문 판단을 이것으로 고정 (점검·연출용). 할 수 없는 판단이면 잠복")]
+    public DoorTactic forceDoorTactic = DoorTactic.None;
 
     public Mode Current { get; private set; } = Mode.Prowl;
     public CharacterStatus Target { get; private set; }
@@ -68,6 +111,13 @@ public class FatherAI : MonoBehaviour, IChaserBrain
     public IReadOnlyList<HidingSpot> SpotQueue => spotQueue;
     public HidingSpot SpotBeingChecked => currentSpot;
     public HidingSpot InvestigateSpot => investigateSpot;
+    public bool IsHesitating => Current == Mode.Pursue && Time.time < hesitateUntil;
+    public EntryPoint DoorTarget { get; private set; }
+    public DoorTactic LastDoorTactic { get; private set; }
+    public bool LastDetourAvailable { get; private set; }
+    public bool IsSneaking => motor != null && motor.quiet;
+    public Vector3 Destination => destination;   // 디버그 표시용
+    public Vector3 AmbushPoint => ambushPoint;
 
     public string DisplayName => name;
     public string StateLabel => Current switch
@@ -75,10 +125,15 @@ public class FatherAI : MonoBehaviour, IChaserBrain
         Mode.Prowl => IntuitionTarget != null ? $"배회 → {ProwlRoom?.roomName} (직감)" : $"배회 → {ProwlRoom?.roomName}",
         Mode.Investigate => "조사",
         Mode.Chase => "추격",
-        Mode.Pursue => "마지막 위치로",
+        Mode.Pursue => IsHesitating ? "놓침 (두리번)" : "마지막 위치로",
         Mode.Intercept => $"앞질러 감 ({CameraTrigger.FindAt(PredictedPoint)?.roomName})",
         Mode.SearchSpots => currentSpot != null ? $"숨는 곳 수색 ({currentSpot.displayName}, 남은 {spotQueue.Count})" : "숨는 곳 수색",
         Mode.Search => "주변 수색",
+        Mode.DoorApproach => $"잠긴 문 확인 ({DoorTarget?.displayName})",
+        Mode.Detour => $"우회 (조용히, {DoorTarget?.displayName} 대신)",
+        Mode.FeignRetreat => feignSneaking ? "위장 후퇴 → 몰래 돌아감" : "위장 후퇴 (포기한 척)",
+        Mode.Ambush => $"잠복 ({DoorTarget?.displayName} 옆)",
+        Mode.Bash => $"문 부수기 ({DoorTarget?.displayName} {DoorTarget?.door?.Durability:0})",
         _ => Current.ToString(),
     };
 
@@ -99,11 +154,24 @@ public class FatherAI : MonoBehaviour, IChaserBrain
     private float nextIntuition;
     private float nextRepath;
     private float holdUntil;
+    private float hesitateUntil;
     private HidingSpot investigateSpot;   // 숨는 소리가 난 곳
     private HidingSpot currentSpot;
     private readonly List<HidingSpot> spotQueue = new List<HidingSpot>();
     private readonly List<Vector3> searchPoints = new List<Vector3>();
     private int searchIndex;
+
+    // 잠긴 문
+    private Vector3 doorGoal;              // 문 너머로 가려던 곳
+    private HidingSpot doorSpot;           // 문 너머에서 뒤지려던 숨는 곳
+    private CameraTrigger doorBehindRoom;  // 문 너머 방
+    private float doorDetourExtra;
+    private float nextDoorCheck;
+    private bool feignSneaking;
+    private Vector3 ambushPoint;
+    private float ambushStart, ambushUntil;
+    private float nextBash;
+    private readonly Dictionary<EntryPoint, float> doorIgnoredUntil = new Dictionary<EntryPoint, float>();
 
     void Awake()
     {
@@ -143,6 +211,8 @@ public class FatherAI : MonoBehaviour, IChaserBrain
         currentSpot = null;
         spotQueue.Clear();
         investigateSpot = null;
+        DoorTarget = null;
+        doorIgnoredUntil.Clear();
         if (Game != null) Game.EndChase(this);
         BeginProwl();
     }
@@ -167,7 +237,10 @@ public class FatherAI : MonoBehaviour, IChaserBrain
         Current = mode;
         modeTime = Time.time;
         pauseUntil = 0f;
-        motor.SetRunning(mode == Mode.Chase || mode == Mode.Pursue || mode == Mode.Intercept || mode == Mode.SearchSpots);
+        hesitateUntil = 0f;
+        motor.quiet = false; // 잠입은 우회·잠복 등에서 따로 켬
+        bool hurry = mode == Mode.DoorApproach || mode == Mode.Detour || mode == Mode.Bash;
+        motor.SetRunning(mode == Mode.Chase || mode == Mode.Pursue || mode == Mode.Intercept || mode == Mode.SearchSpots || (hurry && Chasing));
     }
 
     float InMode => Time.time - modeTime;
@@ -197,12 +270,25 @@ public class FatherAI : MonoBehaviour, IChaserBrain
     void OnHeard(NoiseEvent noise)
     {
         HidingSpot hidingAt = noise.kind == NoiseKind.Hiding ? NearestSpot(noise.position, 1.0f) : null;
+        if (Current == Mode.Ambush)
+        {
+            // 잠복 중 문 너머에서 소리: 아직 안에 있음 → 조금 더 기다림
+            CharacterStatus who = noise.source != null ? noise.source.GetComponent<CharacterStatus>() : null;
+            if (who != null && doorBehindRoom != null && doorBehindRoom.ContainsPoint(noise.position))
+                ambushUntil = Mathf.Min(ambushStart + ambushMaxTime, Mathf.Max(ambushUntil, Time.time + 6f));
+            return;
+        }
+        if (IsDoorMode(Current)) return; // 문 앞 판단 중에는 다른 소리에 끌려가지 않음
+        if (Current == Mode.Prowl || Current == Mode.Investigate)
+        {
+            // 평소에 들은 숨는 소리는 항상 확인
+            Investigate(noise.position, hidingAt);
+            return;
+        }
+        // 쫓는 중에는 확률로만 '확실'하게 그곳을 뒤짐 (아니면 소리 난 쪽을 평소처럼 수색)
+        if (hidingAt != null && rng.NextDouble() >= hidingNoiseCertainty) hidingAt = null;
         switch (Current)
         {
-            case Mode.Prowl:
-            case Mode.Investigate:
-                Investigate(noise.position, hidingAt);
-                break;
             case Mode.Pursue:
             case Mode.Intercept:
                 // 쫓던 대상이 낸 소리면 그쪽으로
@@ -239,6 +325,7 @@ public class FatherAI : MonoBehaviour, IChaserBrain
         HasPrediction = false;
         currentSpot = null;
         spotQueue.Clear();
+        DoorTarget = null;
         if (senses.TryGetLastSeen(who, out Vector3 seen, out _)) lastSeenPosition = seen;
         lastSeenVelocity = Vector3.zero;
         nextSightingRecord = Time.time + sightingInterval;
@@ -272,12 +359,14 @@ public class FatherAI : MonoBehaviour, IChaserBrain
         BeginProwl();
     }
 
-    // 놓친 직후: 마지막으로 본 곳으로
+    // 놓친 직후: 잠깐 두리번거린 뒤 마지막으로 본 곳으로
     void LoseSight()
     {
         goal = lastSeenPosition;
         SetMode(Mode.Pursue);
-        MoveTo(goal);
+        hesitateUntil = Time.time + loseSightHesitation;
+        motor.Stop();
+        destination = transform.position;
     }
 
     // 마지막으로 본 곳에 도착: 움직이던 방향으로 앞질러 가거나, 바로 숨는 곳 수색
@@ -370,6 +459,7 @@ public class FatherAI : MonoBehaviour, IChaserBrain
     {
         if (Game != null && Game.RestartPending) { motor.Stop(); return; }
         if (motor.IsTraversing) return;
+        if (CheckDoorOnRoute()) return;
 
         switch (Current)
         {
@@ -380,6 +470,11 @@ public class FatherAI : MonoBehaviour, IChaserBrain
             case Mode.Intercept: UpdateIntercept(); break;
             case Mode.SearchSpots: UpdateSearchSpots(); break;
             case Mode.Search: UpdateSearch(); break;
+            case Mode.DoorApproach: UpdateDoorApproach(); break;
+            case Mode.Detour: UpdateDetour(); break;
+            case Mode.FeignRetreat: UpdateFeign(); break;
+            case Mode.Ambush: UpdateAmbush(); break;
+            case Mode.Bash: UpdateBash(); break;
         }
     }
 
@@ -458,6 +553,14 @@ public class FatherAI : MonoBehaviour, IChaserBrain
     void UpdatePursue()
     {
         if (CheckReacquire()) return;
+        if (hesitateUntil > 0f)
+        {
+            if (Time.time < hesitateUntil) { LookAround(); return; }
+            hesitateUntil = 0f;
+            modeTime = Time.time;
+            MoveTo(goal);
+            return;
+        }
         if (CheckBlockedPath()) return;
         if (motor.Arrived(0.6f) || InMode > 8f) AfterPursue();
     }
@@ -569,11 +672,15 @@ public class FatherAI : MonoBehaviour, IChaserBrain
 
     // ---------------- 막힌 길 ----------------
 
-    // 지나가려는 순간 누가 문을 잠금: 다른 길(창문·환풍구)이 있으면 길찾기가 알아서 돌아감
-    void OnBlockedOnLink(EntryPoint entry) => MoveTo(destination);
+    // 지나가려는 순간 누가 문을 잠금: 쫓거나 조사하던 중이면 그 문 앞에서 판단, 아니면 다시 길찾기
+    void OnBlockedOnLink(EntryPoint entry)
+    {
+        if (IsDecisionMode(Current) && entry != null && entry.door != null && !IsDoorIgnored(entry)) BeginDoorApproach(entry);
+        else MoveTo(destination);
+    }
 
-    // 목적지까지 어떤 길(창문·환풍구 포함)로도 갈 수 없음.
-    // TODO(3-2단계): 잠긴 문 판단(우회·위장 후퇴·잠복·파괴)으로 바꿈. 지금은 쫓던 중이면 근처 수색, 아니면 다른 방 배회.
+    // 목적지까지 어떤 길(창문·환풍구 포함)로도 갈 수 없음: 막은 잠긴 문이 있으면 그 문 앞에서 판단.
+    // 배회 중이거나 문 때문이 아니면 쫓던 중엔 근처 수색, 아니면 다른 방 배회.
     bool CheckBlockedPath()
     {
         NavMeshAgent agent = motor.Agent;
@@ -581,10 +688,242 @@ public class FatherAI : MonoBehaviour, IChaserBrain
         bool partial = agent.hasPath && agent.pathStatus == NavMeshPathStatus.PathPartial;
         bool fellShort = !agent.hasPath && FlatDistance(transform.position, destination) > 1.0f;
         if (!partial && !fellShort) return false;
+        if (Current != Mode.Prowl && Current != Mode.Search)
+        {
+            EntryPoint door = EntryPoint.FindBlockingDoor(transform.position, destination, agent.areaMask);
+            if (door != null && !IsDoorIgnored(door)) { BeginDoorApproach(door); return true; }
+        }
         if (Chasing) BeginSpotSearch(transform.position, null);
         else BeginProwl();
         return true;
     }
+
+    // ---------------- 잠긴 문 판단 ----------------
+
+    static bool IsDoorMode(Mode mode) =>
+        mode == Mode.DoorApproach || mode == Mode.Detour || mode == Mode.FeignRetreat || mode == Mode.Ambush || mode == Mode.Bash;
+
+    // 쫓거나 조사하러 가는 중 (배회·주변 수색은 판단하지 않음)
+    static bool IsDecisionMode(Mode mode) =>
+        mode == Mode.Investigate || mode == Mode.Pursue || mode == Mode.Intercept || mode == Mode.SearchSpots || mode == Mode.Detour;
+
+    bool IsDoorIgnored(EntryPoint door) => doorIgnoredUntil.TryGetValue(door, out float until) && Time.time < until;
+    void IgnoreDoor(EntryPoint door) { if (door != null) doorIgnoredUntil[door] = Time.time + doorDecisionMemory; }
+
+    // 가는 길(가장 짧은 길)이 잠긴 문을 지나는지 주기적으로 확인. 지나면 길찾기가 알아서 돌아가기 전에 문 앞으로 감
+    bool CheckDoorOnRoute()
+    {
+        if (!IsDecisionMode(Current) || Current == Mode.Detour || IsHesitating || Time.time < nextDoorCheck || motor.Agent.pathPending) return false;
+        nextDoorCheck = Time.time + 0.4f;
+        if (FlatDistance(transform.position, destination) < 1f) return false;
+        EntryPoint door = FatherTactics.LockedDoorOnRoute(transform.position, destination, motor.Agent.areaMask, out _, out _);
+        if (door == null || IsDoorIgnored(door)) return false;
+        BeginDoorApproach(door);
+        return true;
+    }
+
+    void BeginDoorApproach(EntryPoint door)
+    {
+        if (!IsDoorMode(Current))
+        {
+            doorGoal = destination;
+            doorSpot = Current == Mode.Investigate ? investigateSpot : Current == Mode.SearchSpots ? currentSpot : null;
+        }
+        DoorTarget = door;
+        Vector3 front = FrontOf(door);
+        doorBehindRoom = door.OtherSide(CameraTrigger.FindAt(front));
+        SetMode(Mode.DoorApproach);
+        MoveTo(front);
+    }
+
+    void UpdateDoorApproach()
+    {
+        if (!DoorTarget.IsLocked) { ResumeAfterDoor(); return; }
+        if (!motor.Arrived(0.5f))
+        {
+            if (InMode > 15f) GiveUpDoor();
+            return;
+        }
+        FaceTowards(DoorCenter(DoorTarget));
+        if (pauseUntil <= 0f) { pauseUntil = Time.time + doorCheckTime; return; } // 손잡이를 돌려 봄
+        if (Time.time < pauseUntil) return;
+        DecideAtDoor();
+    }
+
+    void DecideAtDoor()
+    {
+        FatherTactics.LockedDoorOnRoute(transform.position, doorGoal, motor.Agent.areaMask, out float direct, out float actual);
+        LastDetourAvailable = actual >= 0f;
+        doorDetourExtra = LastDetourAvailable ? Mathf.Max(0f, actual - Mathf.Max(0f, direct)) : 0f;
+        var situation = new FatherTactics.DoorSituation
+        {
+            detourAvailable = LastDetourAvailable,
+            detourExtra = doorDetourExtra,
+            hasWeapon = hasWeapon,
+            breakable = DoorTarget.door.Breakable,
+        };
+        var weights = new FatherTactics.DoorWeights { detour = detourWeight, feign = feignWeight, ambush = ambushWeight };
+        DoorTactic tactic = forceDoorTactic != DoorTactic.None ? forceDoorTactic : FatherTactics.Choose(situation, weights, rng);
+        if ((tactic == DoorTactic.Detour && !LastDetourAvailable) || (tactic == DoorTactic.Bash && !(hasWeapon && situation.breakable)))
+            tactic = DoorTactic.Ambush;
+        LastDoorTactic = tactic;
+        Debug.Log($"[아버지] {DoorTarget.displayName} 잠김 → {tactic} (우회로 {(LastDetourAvailable ? $"있음 +{doorDetourExtra:0}m" : "없음")}, 무기 {(hasWeapon ? "있음" : "없음")})");
+
+        switch (tactic)
+        {
+            case DoorTactic.Detour: BeginDetour(); break;
+            case DoorTactic.FeignRetreat: BeginFeign(); break;
+            case DoorTactic.Bash: BeginBash(); break;
+            default: BeginAmbush(); break;
+        }
+    }
+
+    // 우회: 창문·환풍구·다른 문으로 조용히 돌아 들어감
+    void BeginDetour()
+    {
+        IgnoreDoor(DoorTarget);
+        SetMode(Mode.Detour);
+        motor.quiet = true;
+        MoveTo(doorGoal);
+    }
+
+    void UpdateDetour()
+    {
+        if (CheckReacquire()) return;
+        if ((doorBehindRoom != null && doorBehindRoom.ContainsPoint(transform.position)) || motor.Arrived(0.6f)) { ResumeAfterDoor(); return; }
+        if (CheckBlockedPath()) return;
+        if (InMode > 45f) GiveUpDoor();
+    }
+
+    // 위장 후퇴: 보란 듯이 걸어서 떠나 포기한 척 → 몰래 우회하거나 돌아와 잠복
+    void BeginFeign()
+    {
+        if (!TryFindRetreatPoint(DoorTarget, out Vector3 retreat)) { BeginAmbush(); return; }
+        feignSneaking = false;
+        SetMode(Mode.FeignRetreat);
+        MoveTo(retreat);
+    }
+
+    void UpdateFeign()
+    {
+        if (!DoorTarget.IsLocked) { ResumeAfterDoor(); return; } // 떠난 줄 알고 문을 열었음
+        if (!motor.Arrived(0.6f) && InMode < 12f) return;
+        if (pauseUntil <= 0f) { pauseUntil = Time.time + feignPause; return; }
+        if (Time.time < pauseUntil) return;
+        feignSneaking = true;
+        if (LastDetourAvailable && rng.NextDouble() < feignDetourChance) BeginDetour();
+        else BeginAmbush();
+    }
+
+    bool TryFindRetreatPoint(EntryPoint door, out Vector3 retreat)
+    {
+        retreat = transform.position;
+        Vector3 center = DoorCenter(door);
+        float best = -1f;
+        for (int i = 0; i < 12; i++)
+        {
+            float angle = (float)rng.NextDouble() * Mathf.PI * 2f;
+            float distance = feignDistance + ((float)rng.NextDouble() - 0.5f) * 3f;
+            Vector3 candidate = center + new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * distance;
+            if (!NavMesh.SamplePosition(candidate, out NavMeshHit hit, 1.5f, motor.Agent.areaMask)) continue;
+            if (doorBehindRoom != null && doorBehindRoom.ContainsPoint(hit.position)) continue;
+            CameraTrigger room = CameraTrigger.FindAt(hit.position);
+            if (room == null || room.buildingId != (doorBehindRoom != null ? doorBehindRoom.buildingId : room.buildingId)) continue; // 집 안에서만
+            float length = FatherTactics.PathLength(transform.position, hit.position, motor.Agent.areaMask, out _);
+            if (length < 0f || length > feignDistance * 2.5f) continue;
+            float away = FlatDistance(hit.position, center);
+            if (away > best) { best = away; retreat = hit.position; }
+        }
+        return best >= feignDistance * 0.6f;
+    }
+
+    // 잠복: 문 옆(문짝이 열리는 자리 밖)에서 조용히 기다림. 문이 열리면 바로 들이닥침
+    void BeginAmbush()
+    {
+        ambushPoint = AmbushPointFor(DoorTarget);
+        SetMode(Mode.Ambush);
+        motor.quiet = true;
+        ambushStart = Time.time;
+        ambushUntil = Time.time + ambushTime;
+        MoveTo(ambushPoint);
+    }
+
+    void UpdateAmbush()
+    {
+        if (!DoorTarget.IsLocked) { ResumeAfterDoor(); return; }
+        if (motor.Arrived(0.4f)) FaceTowards(DoorCenter(DoorTarget));
+        if (Time.time > ambushUntil) GiveUpDoor();
+    }
+
+    Vector3 AmbushPointFor(EntryPoint door)
+    {
+        Vector3 center = DoorCenter(door);
+        Vector3 off = FrontOf(door) - center; off.y = 0f;
+        Vector3 along = Vector3.ProjectOnPlane(door.transform.forward, Vector3.up).normalized;
+        foreach (float side in new[] { -1f, 1f })
+        {
+            Vector3 candidate = center + off * 0.8f + along * side * 1.4f;
+            if (NavMesh.SamplePosition(candidate, out NavMeshHit hit, 0.6f, motor.Agent.areaMask) && Reachable(hit.position)
+                && (doorBehindRoom == null || !doorBehindRoom.ContainsPoint(hit.position)))
+                return hit.position;
+        }
+        return FrontOf(door);
+    }
+
+    // 파괴: 무기로 문을 내리침 (우회로가 없을 때 최후의 수단)
+    void BeginBash()
+    {
+        SetMode(Mode.Bash);
+        nextBash = Time.time + 0.3f;
+        MoveTo(FrontOf(DoorTarget));
+    }
+
+    void UpdateBash()
+    {
+        if (!DoorTarget.IsLocked) { ResumeAfterDoor(); return; } // 부서짐(또는 누가 열어 줌)
+        if (!motor.Arrived(0.5f)) return;
+        FaceTowards(DoorCenter(DoorTarget));
+        if (InMode > bashGiveUpTime || !DoorTarget.door.Breakable) { GiveUpDoor(); return; }
+        if (Time.time < nextBash) return;
+        DoorTarget.door.Bash(bashDamage, gameObject);
+        nextBash = Time.time + bashInterval;
+    }
+
+    // 문이 열렸거나 부서졌거나 돌아 들어왔음: 하던 일 계속
+    void ResumeAfterDoor()
+    {
+        IgnoreDoor(DoorTarget);
+        DoorTarget = null;
+        HidingSpot spot = doorSpot;
+        doorSpot = null;
+        if (spot != null)
+        {
+            if (Chasing) BeginSpotSearch(spot.transform.position, spot);
+            else Investigate(spot.transform.position, spot);
+        }
+        else if (Chasing)
+        {
+            goal = doorGoal;
+            SetMode(Mode.Pursue);
+            MoveTo(doorGoal);
+        }
+        else Investigate(doorGoal, null);
+    }
+
+    void GiveUpDoor()
+    {
+        IgnoreDoor(DoorTarget);
+        DoorTarget = null;
+        doorSpot = null;
+        if (Chasing) GiveUp();
+        else BeginProwl();
+    }
+
+    // 문의 내 쪽 앞 지점
+    Vector3 FrontOf(EntryPoint door) =>
+        (door.PointA - transform.position).sqrMagnitude <= (door.PointB - transform.position).sqrMagnitude ? door.PointA : door.PointB;
+
+    static Vector3 DoorCenter(EntryPoint door) => (door.PointA + door.PointB) * 0.5f;
 
     // ---------------- 도우미 ----------------
 
@@ -716,6 +1055,13 @@ public class FatherAI : MonoBehaviour, IChaserBrain
         {
             Gizmos.color = Color.cyan;
             foreach (Vector3 p in searchPoints) Gizmos.DrawWireSphere(p, 0.25f);
+        }
+        if (DoorTarget != null && IsDoorMode(Current))
+        {
+            Gizmos.color = Current == Mode.Bash ? Color.red : new Color(1f, 0.6f, 0f);
+            Gizmos.DrawLine(transform.position, DoorCenter(DoorTarget));
+            if (Current == Mode.Ambush) Gizmos.DrawWireCube(ambushPoint + Vector3.up * 0.1f, new Vector3(0.5f, 0.1f, 0.5f));
+            if (Current == Mode.Detour || Current == Mode.FeignRetreat) Gizmos.DrawWireSphere(destination, 0.3f);
         }
         if (Current == Mode.Prowl && IntuitionTarget != null)
         {
