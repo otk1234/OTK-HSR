@@ -34,7 +34,17 @@ public static class GuiltSystemValidator
     public static GuiltActionTable EnsureTableAsset()
     {
         var asset = AssetDatabase.LoadAssetAtPath<GuiltActionTable>(TableAsset);
-        if (asset != null) return asset;
+        if (asset != null)
+        {
+            int added = asset.AddMissingDefaults();
+            if (added > 0)
+            {
+                EditorUtility.SetDirty(asset);
+                AssetDatabase.SaveAssets();
+                Debug.Log($"{Tag} 행동 표에 새 기본 행동 {added}개 추가");
+            }
+            return asset;
+        }
         if (!AssetDatabase.IsValidFolder("Assets/Resources")) AssetDatabase.CreateFolder("Assets", "Resources");
         asset = ScriptableObject.CreateInstance<GuiltActionTable>();
         asset.FillDefaults();
@@ -51,7 +61,9 @@ public static class GuiltSystemValidator
         GuiltActionTable asset = EnsureTableAsset();
         GuiltSystem.Table = null;
         Check(GuiltSystem.Table == asset, "Resources에서 행동 표를 불러옴");
-        Check(asset.tiers.Length == 7 && asset.actions.Length == 10, $"행동 표: 단계 {asset.tiers.Length}개, 행동 {asset.actions.Length}개");
+        Check(asset.tiers.Length == 7 && asset.actions.Length == 13, $"행동 표: 단계 {asset.tiers.Length}개, 행동 {asset.actions.Length}개");
+        Check(asset.Find("abet_crime")?.amount == 8 && asset.Find("incite_crime")?.amount == 5 && asset.Find("prevent_crime")?.amount == -5,
+            "개입 죄책감: 가담 +8, 종용 +5, 막기 −5");
 
         // 계산은 기본값 표로 (기획이 에셋 수치를 바꿔도 점검이 흔들리지 않게)
         var table = ScriptableObject.CreateInstance<GuiltActionTable>();

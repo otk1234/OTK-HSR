@@ -21,9 +21,14 @@ public abstract class CharacterInteractable : MonoBehaviour
     // 아직 쓸 수 있는가 (다 밀었거나 다 고쳤으면 false → 안내도 사라짐)
     public abstract bool Available { get; }
     public bool Busy { get; protected set; }
+    public float Progress { get; private set; }      // 0~1 (동작 중 진행도, 개발용 표시)
+    public string ActionName => ActionLabel;
     protected abstract string ActionLabel { get; }   // "밀기", "고치기"
     protected abstract float WorkTime { get; }
     protected abstract void OnWorkDone(PlayerInteraction user);
+
+    // 캐릭터마다 걸리는 시간이 다르면 덮어씀 (예: 시체 치우기는 여동생이 오래 걸림)
+    public virtual float WorkTimeFor(CharacterType who) => WorkTime;
 
     public bool CanUse(CharacterType type) => requiredCharacter == CharacterType.All || requiredCharacter == type;
 
@@ -44,18 +49,27 @@ public abstract class CharacterInteractable : MonoBehaviour
     IEnumerator Work(PlayerInteraction user)
     {
         Busy = true;
+        Progress = 0f;
         SetLock(user, true);
         if (noiseRadius > 0f) NoiseSystem.Emit(transform.position, noiseRadius, NoiseKind.Other, user.gameObject);
-        yield return WorkRoutine();
+        float duration = Mathf.Max(0.01f, WorkTimeFor(user.myType));
+        IEnumerator routine = WorkRoutine(duration);
+        for (float t = 0f; ; t += Time.deltaTime)
+        {
+            Progress = Mathf.Clamp01(t / duration);
+            if (!routine.MoveNext()) break;
+            yield return routine.Current;
+        }
+        Progress = 1f;
         SetLock(user, false);
         Busy = false;
         OnWorkDone(user);
     }
 
     // 기본: 시간만 기다림. 움직임이 있으면 덮어씀.
-    protected virtual IEnumerator WorkRoutine()
+    protected virtual IEnumerator WorkRoutine(float duration)
     {
-        yield return new WaitForSeconds(WorkTime);
+        for (float t = 0f; t < duration; t += Time.deltaTime) yield return null;
     }
 
     static void SetLock(PlayerInteraction user, bool locked)

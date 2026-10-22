@@ -7,6 +7,7 @@ using UnityEngine;
 public class CrimeSceneDirector : MonoBehaviour
 {
     public CrimeSceneTimer timer;
+    public DeductionBoard board;
 
     [Header("사건 이름 (임시)")]
     public string caseTitle = "302호 살인 사건 (임시)";
@@ -47,7 +48,21 @@ public class CrimeSceneDirector : MonoBehaviour
         text.AppendLine($"단서 {CaseFile.Entries.Count}개   <color=#bbbbbb>[J] 추리 창</color>");
         foreach (CaseFile.Entry entry in CaseFile.Entries) text.AppendLine($" · {entry.title}");
 
-        var box = new Rect(Screen.width - 268, 150, 256, 96 + CaseFile.Entries.Count * 17);
+        // 개입: 정한 방향 → 한 일
+        string caseId = board != null && board.deduction != null ? board.deduction.caseId : "";
+        int extra = 0;
+        if (CaseState.TryGetDirection(caseId, out InterventionKind direction))
+        {
+            string done = "";
+            foreach (CaseState.InterventionRecord r in CaseState.Interventions)
+                if (r.caseId == caseId) done = " (완료)";
+            text.AppendLine($"개입 방향: {Intervention.KindName(direction)}{done}");
+            extra++;
+        }
+        foreach (CharacterInteractable work in FindObjectsByType<CharacterInteractable>(FindObjectsSortMode.None))
+            if (work.Busy) { text.AppendLine($"<color=#ffd966>{work.displayName} {work.ActionName}... {work.Progress:P0}</color>"); extra++; }
+
+        var box = new Rect(Screen.width - 268, 150, 256, 96 + (CaseFile.Entries.Count + extra) * 17);
         GUI.color = new Color(0f, 0f, 0f, 0.6f);
         GUI.DrawTexture(box, Texture2D.whiteTexture);
         GUI.color = Color.white;

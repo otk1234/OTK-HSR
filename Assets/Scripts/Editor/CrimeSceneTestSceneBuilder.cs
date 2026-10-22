@@ -185,10 +185,14 @@ public static class CrimeSceneTestSceneBuilder
             integration.completeMessage = "경찰이 오기 전에 현장을 조사해 단서를 모으자.";
 
             var timer = systems.AddComponent<CrimeSceneTimer>();
-            systems.AddComponent<CrimeSceneDirector>().timer = timer;
+            var director = systems.AddComponent<CrimeSceneDirector>();
+            director.timer = timer;
             var board = systems.AddComponent<DeductionBoard>();
+            director.board = board;
             board.deduction = EnsureDeductionAsset();
             board.timer = timer;
+            systems.AddComponent<InterventionPlanner>().board = board;
+            GuiltSystemValidator.EnsureTableAsset(); // 개입 죄책감 행동(종용·가담·막기)이 행동 표에 있도록
 
             EditorSceneManager.SaveScene(scene, TargetScene);
             AddToBuildSettings();
@@ -233,6 +237,7 @@ public static class CrimeSceneTestSceneBuilder
         B.TallBox(furniture, "주방 조리대", new Vector3(7.6f, 0f, -2.8f), new Vector3(0.7f, 0f, 4.8f), 0.9f, 1f, B.woodMat);
         B.TallBox(furniture, "식탁", new Vector3(4.4f, 0f, -3f), new Vector3(1.3f, 0f, 1f), 0.75f, 0.8f, B.woodMat);
         B.TallBox(furniture, "침대", new Vector3(-3.2f, 0f, 4.6f), new Vector3(1.6f, 0f, 2.1f), 0.5f, 0.6f, B.linenMat);
+        B.TallBox(furniture, "협탁", new Vector3(-4.6f, 0f, 5.55f), new Vector3(0.5f, 0f, 0.45f), 0.55f, 0.6f, B.woodMat);
         B.TallBox(furniture, "옷장", new Vector3(-1.6f, 0f, 5.6f), new Vector3(0.9f, 0f, 0.6f), 1.6f, 2f, B.hideMat);
         B.TallBox(furniture, "욕조", new Vector3(2.2f, 0f, 4.4f), new Vector3(1f, 0f, 2f), 0.55f, 0.6f, B.tubMat);
         B.TallBox(furniture, "세면대", new Vector3(-0.45f, 0f, 5.5f), new Vector3(0.6f, 0f, 0.5f), 0.85f, 0.9f, B.tubMat);
@@ -320,6 +325,51 @@ public static class CrimeSceneTestSceneBuilder
 
         RepairableMachine recorder = BuildMachine(root, "인터폰 녹화기", new Vector3(7.85f, 1.3f, 3.5f));
         recorder.revealWhenRepaired = new[] { video.gameObject };
+
+        // ---- 개입 지점 (남매가 정한 방향의 것만 쓸 수 있음, 사건마다 한 번) ----
+        // 종용: 침실 협탁의 피해자 휴대전화 (정보 조작 → 여동생이 빠름)
+        Visual(root, "피해자 휴대전화", new Vector3(-4.6f, 0.57f, 5.55f), new Vector3(0.1f, 0.02f, 0.18f), machineMat);
+        BuildIntervention(root, "피해자 휴대전화", new Vector3(-4.6f, 0f, 4.9f), new Vector3(1.6f, 2f, 1.4f), InterventionKind.Incite, "문자 조작하기",
+            "피해자 휴대전화로 박 선생에게 '목요일 약속 장소를 인적 없는 공원으로 바꾸자'는 문자를 보냈다. 아버지가 그곳을 택하게 된다.",
+            2.5f, 5f, "incite_crime", "문자를 보냈다. 아빠는... 그곳으로 갈 것이다.");
+
+        // 가담: 시체를 욕실로 옮겨 숨김 (힘 → 오빠가 빠름, 여동생은 오래 걸림)
+        Intervention hideBody = BuildIntervention(root, "시체", new Vector3(-3.6f, 0f, -3.4f), new Vector3(2.4f, 2f, 2f), InterventionKind.Abet, "욕실로 옮겨 숨기기",
+            "시체를 욕실로 옮겨 숨기고 현장을 정리했다. 발견이 늦어진다.",
+            9f, 3.5f, "abet_crime", "시체를 옮겼다... 이제 돌이킬 수 없다.");
+        hideBody.hideWhenDone = new[] { body.gameObject };
+        hideBody.noiseRadius = 6f;
+
+        // 막기: 식탁 위 편지지로 박 선생에게 경고 편지 (정보 → 여동생이 빠름)
+        Visual(root, "편지지", new Vector3(4.75f, 0.79f, -2.72f), new Vector3(0.22f, 0.01f, 0.3f), paperMat);
+        Visual(root, "펜", new Vector3(4.92f, 0.8f, -2.7f), new Vector3(0.02f, 0.02f, 0.16f), machineMat);
+        BuildIntervention(root, "편지지", new Vector3(4.4f, 0f, -1.9f), new Vector3(1.8f, 2f, 1.4f), InterventionKind.Prevent, "경고 편지 쓰기",
+            "박 선생에게 '목요일 밤에는 누구도 집에 들이지 마세요'라는 경고 편지를 썼다.",
+            2.5f, 5f, "prevent_crime", "경고 편지를 썼다. 박 선생에게 전해야 한다.");
+    }
+
+    static Intervention BuildIntervention(Transform root, string name, Vector3 floor, Vector3 reachSize, InterventionKind kind, string actionLabel,
+        string summary, float sisterTime, float brotherTime, string guiltActionId, string doneMessage)
+    {
+        var go = new GameObject($"개입 ({Intervention.KindName(kind)}): {name}");
+        go.transform.SetParent(root);
+        go.transform.position = floor;
+        var reach = go.AddComponent<BoxCollider>();
+        reach.isTrigger = true;
+        reach.center = new Vector3(0f, 1f, 0f);
+        reach.size = reachSize;
+
+        var intervention = go.AddComponent<Intervention>();
+        intervention.displayName = name;
+        intervention.kind = kind;
+        intervention.actionLabel = actionLabel;
+        intervention.summary = summary;
+        intervention.sisterTime = sisterTime;
+        intervention.brotherTime = brotherTime;
+        intervention.guiltActionId = guiltActionId;
+        intervention.doneMessage = doneMessage;
+        intervention.noiseRadius = 2f;
+        return intervention;
     }
 
     static HeavyObject BuildHeavyObject(Transform root, string name, Vector3 floor, Vector3 size, Vector3 pushOffset)

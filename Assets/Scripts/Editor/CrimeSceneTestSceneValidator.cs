@@ -77,6 +77,11 @@ public static class CrimeSceneTestSceneValidator
                         if (!clueIds.Contains(id)) problems.Add($"추리 '{q.id}': 씬에 없는 단서 {id}");
             }
         }
+        var interventions = Object.FindObjectsByType<Intervention>();
+        foreach (InterventionKind kind in Enum.GetValues(typeof(InterventionKind)))
+            if (interventions.Count(i => i.kind == kind) != 1) problems.Add($"개입 지점 '{Intervention.KindName(kind)}'이(가) 1개가 아님");
+        var planner = Object.FindAnyObjectByType<InterventionPlanner>();
+        if (planner == null || planner.board == null) problems.Add("개입 방향 대화(InterventionPlanner) 연결 안 됨");
         var machine = Object.FindAnyObjectByType<RepairableMachine>();
         if (machine == null || machine.requiredCharacter != CharacterType.Player2 || machine.revealWhenRepaired.Length == 0) problems.Add("녹화기(오빠 전용 기계) 설정 안 됨");
 
@@ -297,6 +302,40 @@ public static class CrimeSceneTestSceneValidator
         Check(!board.IsOpen && !brother.GetComponent<PlayerMovement>().Locks.IsLocked && !manager.SwitchLocks.IsLocked && brother.GetComponent<PlayerInteractor3D>().enabled,
             "추리 창을 닫으면 잠금 풀림");
 
+        // ---- 개입: 남매 대화로 방향을 정하고, 그 종류만 한 번 ----
+        var planner = Object.FindAnyObjectByType<InterventionPlanner>();
+        Intervention[] spots = Object.FindObjectsByType<Intervention>();
+        Intervention Spot(InterventionKind kind) => spots.First(i => i.kind == kind);
+        Check(!planner.IsOpen && spots.All(i => !i.Available), "방향을 정하기 전에는 어떤 개입도 할 수 없음");
+        yield return planner.openDelay + 0.4f;
+        Check(planner.IsOpen && brother.GetComponent<PlayerMovement>().Locks.Has(LockReason.Deduction), "추리를 마치고 창을 닫으면 잠시 뒤 남매 대화(방향 정하기)가 열림");
+        Check(planner.Choose(InterventionKind.Abet) && !planner.IsOpen && CaseState.TryGetDirection(data.caseId, out InterventionKind chosen) && chosen == InterventionKind.Abet,
+            "여동생이 '가담'을 고름 → 방향 확정");
+        Check(!planner.Choose(InterventionKind.Prevent) && !brother.GetComponent<PlayerMovement>().Locks.IsLocked, "방향은 바꿀 수 없음, 대화가 닫히면 잠금 풀림");
+        Check(Spot(InterventionKind.Abet).Available && !Spot(InterventionKind.Incite).Available && !Spot(InterventionKind.Prevent).Available,
+            "정한 방향(가담)의 개입 지점만 쓸 수 있음");
+        Intervention hideBody = Spot(InterventionKind.Abet);
+        Check(hideBody.WorkTimeFor(CharacterType.Player1) > hideBody.WorkTimeFor(CharacterType.Player2)
+              && Spot(InterventionKind.Prevent).WorkTimeFor(CharacterType.Player1) < Spot(InterventionKind.Prevent).WorkTimeFor(CharacterType.Player2),
+            $"능력에 따라 시간이 다름: 시체 치우기 여동생 {hideBody.WorkTimeFor(CharacterType.Player1)}초 / 오빠 {hideBody.WorkTimeFor(CharacterType.Player2)}초, 경고 편지는 여동생이 빠름");
+
+        manager.SwitchInstant(0);
+        Place(sister, new Vector3(-3.6f, 0f, -2.3f));
+        yield return 0.3f;
+        Check(sisterHands.HasTarget, "시체 앞에 서면 개입 대상으로 잡힘");
+        float workStarted = Time.time;
+        hideBody.Use(sisterHands);
+        yield return 2f;
+        Check(hideBody.Busy && hideBody.Progress > 0.1f && hideBody.Progress < 0.5f && sister.GetComponent<PlayerMovement>().Locks.Has(LockReason.Working),
+            $"여동생이 시체를 옮기는 중 (진행 {hideBody.Progress:P0}, 이동 잠김)");
+        for (float waited = 0f; waited < 10f && !hideBody.Done; waited += 0.25f) yield return 0.25f;
+        float took = Time.time - workStarted;
+        Check(hideBody.Done && took >= hideBody.sisterTime - 0.5f, $"여동생은 오래 걸림 ({took:0.0}초)");
+        Check(CaseState.HasIntervened(data.caseId) && CaseState.Interventions[0].kind == InterventionKind.Abet && CaseState.Interventions[0].doneBy == CharacterType.Player1,
+            "개입 기록 (가담, 여동생)");
+        Check(GuiltSystem.Value == 58 && !Area("시체").gameObject.activeInHierarchy, $"가담 → 죄책감 +8 ({GuiltSystem.Value}), 시체가 치워짐");
+        Check(spots.All(i => !i.Available), "사건마다 개입은 한 번");
+
         // ---- 시간 종료 → 추리 창 자동으로 열림 ----
         bool timeUp = false;
         timer.TimeUp += () => timeUp = true;
@@ -305,6 +344,8 @@ public static class CrimeSceneTestSceneValidator
         Check(timer.Expired && timeUp && timer.Remaining == 0f, "제한 시간이 끝나면 TimeUp 이벤트 (추격자는 아직 없음)");
         Check(board.IsOpen, "시간이 끝나면 추리 창이 자동으로 열림");
         board.Close();
-        Check(GuiltSystem.Value == 50, "조사만으로는 죄책감이 바뀌지 않음");
+        yield return planner.openDelay + 0.4f;
+        Check(!planner.IsOpen, "방향을 이미 정했으면 대화가 다시 열리지 않음");
+        Check(GuiltSystem.History.Count == 1 && GuiltSystem.History[0].actionId == "abet_crime", "죄책감은 개입으로만 바뀜 (조사·추리로는 안 바뀜)");
     }
 }

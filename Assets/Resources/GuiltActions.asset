@@ -69,3 +69,15 @@ MonoBehaviour:
     description: "\uC9C4\uC2E4\uC744 \uB9D0\uD558\uAE30 (\uC790\uBC31)"
     amount: -10
     oncePerChapter: 1
+  - id: incite_crime
+    description: "\uBC94\uC8C4\uB97C \uC885\uC6A9\uD558\uAE30"
+    amount: 5
+    oncePerChapter: 1
+  - id: abet_crime
+    description: "\uBC94\uC8C4\uC5D0 \uAC00\uB2F4\uD558\uAE30"
+    amount: 8
+    oncePerChapter: 1
+  - id: prevent_crime
+    description: "\uC774\uC5B4\uC9C8 \uBC94\uC8C4\uB97C \uB9C9\uAE30"
+    amount: -5
+    oncePerChapter: 1

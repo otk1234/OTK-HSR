@@ -58,7 +58,25 @@ public class GuiltActionTable : ScriptableObject
             new Entry { id = "help_npc", description = "NPC 돕기", amount = -5 },
             new Entry { id = "return_stolen", description = "훔친 물건 돌려놓기", amount = -6 },
             new Entry { id = "confess", description = "진실을 말하기 (자백)", amount = -10 },
+            // 범행 현장 개입 (챕터가 많으므로 변동폭을 작게)
+            new Entry { id = "incite_crime", description = "범죄를 종용하기", amount = 5 },
+            new Entry { id = "abet_crime", description = "범죄에 가담하기", amount = 8 },
+            new Entry { id = "prevent_crime", description = "이어질 범죄를 막기", amount = -5 },
         };
+    }
+
+    // 기본 목록에는 있는데 에셋에 없는 행동만 추가 (기획이 고친 값은 그대로 둠). 추가한 개수
+    public int AddMissingDefaults()
+    {
+        var defaults = CreateInstance<GuiltActionTable>();
+        defaults.FillDefaults();
+        var list = new System.Collections.Generic.List<Entry>(actions ?? new Entry[0]);
+        int added = 0;
+        foreach (Entry entry in defaults.actions)
+            if (Find(entry.id) == null) { list.Add(entry); added++; }
+        actions = list.ToArray();
+        DestroyImmediate(defaults);
+        return added;
     }
 
     public Entry Find(string id)

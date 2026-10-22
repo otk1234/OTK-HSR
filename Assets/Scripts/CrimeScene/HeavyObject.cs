@@ -21,12 +21,12 @@ public class HeavyObject : CharacterInteractable
     protected override string ActionLabel => "밀기";
     protected override float WorkTime => pushTime;
 
-    protected override IEnumerator WorkRoutine()
+    protected override IEnumerator WorkRoutine(float duration)
     {
         Vector3 from = transform.position, to = from + pushOffset;
-        for (float t = 0f; t < pushTime; t += Time.deltaTime)
+        for (float t = 0f; t < duration; t += Time.deltaTime)
         {
-            transform.position = Vector3.Lerp(from, to, t / pushTime);
+            transform.position = Vector3.Lerp(from, to, t / duration);
             yield return null;
         }
         transform.position = to;

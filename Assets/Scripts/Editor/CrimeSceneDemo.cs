@@ -272,11 +272,31 @@ public static class CrimeSceneDemo
         board.Choose(0);
         yield return 1f;
         Say("⑥ 추리 결과 (정답·오답)는 다음 사건으로 넘겨집니다. 다음 단계 = 개입 (종용 · 가담 · 막기)");
-        yield return 5f;
-
+        yield return 4.5f;
         board.Close();
+
+        // ---- 7. 개입: 남매 대화로 방향 → 그 종류만 한 번 ----
+        var planner = Object.FindAnyObjectByType<InterventionPlanner>();
+        Say("⑦ 추리를 마치면 남매가 <b>이번 사건의 방향</b>을 정합니다 (개발용 대화 화면).\n정한 방향의 개입만 할 수 있고, 사건마다 한 번.");
+        for (int i = 0; i < 40 && !planner.IsOpen; i++) yield return 0.1f;
+        yield return 5f;
+        Say("⑦ 이번엔 <b>가담</b>: 시체를 욕실로 옮겨 숨깁니다.\n(종용 = 휴대전화 문자 조작, 막기 = 식탁 위 편지지로 경고 편지 → 지금은 잠김)");
+        planner.Choose(InterventionKind.Abet);
+        yield return 4.5f;
+
+        var hideBody = Object.FindObjectsByType<Intervention>(FindObjectsSortMode.None).First(i => i.kind == InterventionKind.Abet);
+        Say($"⑦ 누구나 할 수 있지만 <b>능력에 따라 시간이 다름</b>: 시체 옮기기는\n오빠 {hideBody.brotherTime}초 · 여동생 {hideBody.sisterTime}초. 오빠가 옮깁니다.");
+        brother.GetComponent<NavMeshAgent>().Warp(new Vector3(-3.6f, 0f, -2.3f));
+        manager.SwitchInstant(1);
+        yield return 2f;
+        hideBody.Use(brotherHands);
+        yield return hideBody.brotherTime + 1.5f;
+        Say($"⑦ 가담 → <b>죄책감 +8</b> (지금 {GuiltSystem.Value}, {GuiltSystem.TierName}). 개입 결과도 다음 사건으로 넘겨집니다.\n(변동폭은 챕터가 많으므로 작게: 종용 +5 · 가담 +8 · 막기 −5)");
+        yield return 6f;
+
         timer.SetRemaining(timer.timeLimit);
-        Say("시연 끝. 타이머를 180초로 되돌렸습니다. 이제 직접 조작해 보세요. (추리는 이미 답해서 결과만 보임)\n남은 조사 지점: 깨진 재떨이 · 핏자국 · 식탁 찻잔 · 욕조 수건  (WASD 이동 · E 조사/상호작용 · Tab 전환 · J 추리)");
+        manager.SwitchInstant(0);
+        Say("시연 끝. 타이머를 180초로 되돌렸습니다. 이제 직접 조작해 보세요. (추리·개입은 이미 끝나 결과만 보임)\n남은 조사 지점: 깨진 재떨이 · 핏자국 · 식탁 찻잔 · 욕조 수건  (WASD 이동 · E 조사/상호작용 · Tab 전환 · J 추리)");
         yield return 12f;
         Say("");
     }

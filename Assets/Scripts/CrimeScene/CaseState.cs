@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-// 다음 사건으로 넘길 결과 (추리 답, 오답에 따른 다음 사건 오류). 다음 사건이 아직 없으므로 지금은 기록과 로그만.
+// 다음 사건으로 넘길 결과 (추리 답, 오답에 따른 다음 사건 오류, 개입 방향·개입). 다음 사건이 아직 없으므로 지금은 기록과 로그만.
 // 씬이 바뀌거나 재시작돼도 남도록 static, 플레이를 새로 시작하면 비움.
 public static class CaseState
 {
@@ -49,10 +49,52 @@ public static class CaseState
         return true;
     }
 
+    // ---------------- 개입 (사건마다 방향 하나, 개입 한 번) ----------------
+
+    public struct InterventionRecord
+    {
+        public string caseId;
+        public InterventionKind kind;
+        public string text;
+        public CharacterType doneBy;
+    }
+
+    static readonly Dictionary<string, InterventionKind> directions = new Dictionary<string, InterventionKind>();
+    static readonly List<InterventionRecord> interventions = new List<InterventionRecord>();
+    public static IReadOnlyList<InterventionRecord> Interventions => interventions;
+
+    public static bool TryGetDirection(string caseId, out InterventionKind kind) => directions.TryGetValue(caseId, out kind);
+
+    // 한 번 정하면 바꿀 수 없음
+    public static bool SetDirection(string caseId, InterventionKind kind)
+    {
+        if (directions.ContainsKey(caseId)) return false;
+        directions[caseId] = kind;
+        Debug.Log($"[개입] 이번 사건의 방향: {Intervention.KindName(kind)}");
+        return true;
+    }
+
+    public static bool HasIntervened(string caseId)
+    {
+        foreach (InterventionRecord r in interventions)
+            if (r.caseId == caseId) return true;
+        return false;
+    }
+
+    public static bool RecordIntervention(string caseId, InterventionKind kind, string text, CharacterType by)
+    {
+        if (HasIntervened(caseId)) return false;
+        interventions.Add(new InterventionRecord { caseId = caseId, kind = kind, text = text, doneBy = by });
+        Debug.Log($"[개입] {Intervention.KindName(kind)}: {text} ({by}) → 다음 사건에 반영 예정");
+        return true;
+    }
+
     public static void Clear()
     {
         answers.Clear();
         nextCaseErrors.Clear();
+        directions.Clear();
+        interventions.Clear();
     }
 
     // 도메인 리로드가 꺼져 있으므로(Enter Play Mode Options) 플레이를 시작할 때마다 직접 비웁니다.
