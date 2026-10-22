@@ -43,6 +43,8 @@ public static class PlannerReferenceSmokeTest
         var integration = UnityEngine.Object.FindFirstObjectByType<PrototypeIntegration>();
         Check(demo != null && manager.players.Length == 2, "two players and reference demo");
         Check(integration != null && integration.OverviewFollowEnabled, "overview camera follows active player only in reference scene");
+        Check(integration.characterNames[0] == "오빠" && integration.characterNames[1] == "동생", "sibling character labels");
+        Check(integration.InventoryCapacityFor(0) == 6 && integration.InventoryCapacityFor(1) == 5, "brother has one additional inventory slot");
         Check(demo.SaveBedExists, "second-floor dummy save bed");
         Check(UnityEngine.Object.FindFirstObjectByType<NarrativeGraybox.UI.SimpleGameHud>().enabled == false, "original HUD disabled only in clone");
         Check(demo.EquipSelected(manager.players[0]), "player 1 equips item");

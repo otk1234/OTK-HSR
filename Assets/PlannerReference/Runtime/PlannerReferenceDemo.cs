@@ -36,6 +36,7 @@ public sealed class PlannerReferenceDemo : MonoBehaviour
         if (originalHud != null) originalHud.enabled = false;
 
         var integration = FindFirstObjectByType<PrototypeIntegration>();
+        integration.EnableSiblingCharacterRules();
         integration.EnableOverviewCameraFollow();
         PrototypeFloorTravel.EnsureCreated(integration);
         CreateSaveBed();
@@ -165,7 +166,8 @@ public sealed class PlannerReferenceDemo : MonoBehaviour
         int index = manager.ActivePlayerIndex;
         CharacterUiState state = states[active];
         Inventory inventory = active.GetComponent<Inventory>();
-        string character = index == 0 ? "탐정" : "조수";
+        string character = index == 0 ? "오빠" : "동생";
+        int inventoryCapacity = index == 0 ? 6 : 5;
         string location = active.transform.position.x > 40 ? "저택 · 2층" : "저택 · 1층";
 
         Panel(new Rect(20, 20, 285, 88));
@@ -177,11 +179,11 @@ public sealed class PlannerReferenceDemo : MonoBehaviour
         MiniMap(new Rect(width - 210, 58, 170, 66), active.transform.position.x > 40);
 
         float bottom = height - 20;
-        Panel(new Rect(20, bottom - 135, 430, 135));
+        Panel(new Rect(20, bottom - 135, 490, 135));
         Portrait(new Rect(35, bottom - 118, 82, 82), index);
         Label(new Rect(35, bottom - 34, 82, 24), character, 14, true);
-        Label(new Rect(132, bottom - 118, 280, 24), "소지품  " + inventory.items.Count + " / 5", 16);
-        for (int i = 0; i < 5; i++)
+        Label(new Rect(132, bottom - 118, 340, 24), "소지품  " + inventory.items.Count + " / " + inventoryCapacity, 16);
+        for (int i = 0; i < inventoryCapacity; i++)
         {
             Rect slot = new Rect(132 + i * 56, bottom - 79, 48, 48);
             Slot(slot, i < inventory.items.Count ? inventory.items[i] : "", state.selecting && state.selectedSlot == i);

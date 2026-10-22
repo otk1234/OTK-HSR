@@ -44,6 +44,7 @@ public class PrototypeIntegration : MonoBehaviour
 
     [Header("소지품 칸 수 (HUD 표시와 같게)")]
     public int inventorySize = 5;
+    private bool useSiblingCharacterRules;
 
     [Header("진행 목표 (위에서부터 순서대로)")]
     public Objective[] objectives;
@@ -183,6 +184,18 @@ public class PrototypeIntegration : MonoBehaviour
 
     public bool OverviewFollowEnabled => overviewFollowEnabled;
 
+    // 기획 참고용 남매 규칙: 오빠(0번)는 기본보다 소지품을 한 칸 더 사용합니다.
+    public void EnableSiblingCharacterRules()
+    {
+        useSiblingCharacterRules = true;
+        characterNames = new[] { "오빠", "동생" };
+    }
+
+    public int InventoryCapacityFor(int playerIndex)
+    {
+        return inventorySize + (useSiblingCharacterRules && playerIndex == 0 ? 1 : 0);
+    }
+
     void SyncHud(GameObject active)
     {
         int index = CharacterManager.instance.ActivePlayerIndex;
@@ -238,7 +251,8 @@ public class PrototypeIntegration : MonoBehaviour
     bool AddToActiveInventory(string itemName)
     {
         Inventory inventory = CharacterManager.instance.GetActivePlayer().GetComponent<Inventory>();
-        if (inventory.items.Count >= inventorySize) return false;
+        int capacity = InventoryCapacityFor(CharacterManager.instance.ActivePlayerIndex);
+        if (inventory.items.Count >= capacity) return false;
         inventory.AddItem(itemName);
         return true;
     }
