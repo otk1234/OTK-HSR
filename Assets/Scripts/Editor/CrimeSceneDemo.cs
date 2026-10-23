@@ -189,7 +189,7 @@ public static class CrimeSceneDemo
 
         // ---- 추리 창: 단서가 없으면 정답 선택지가 잠김 ----
         var board = Object.FindAnyObjectByType<DeductionBoard>();
-        Say("<b>[J] 추리 창</b> (개발용 최소 화면). 아직 단서가 없어서\n정답 선택지가 <b>??? (근거 단서 부족)</b>으로 잠겨 있습니다.");
+        Say("<b>[J] 추리 창</b> (개발용 최소 화면). 선택지는 정답·오답 모두 근거 단서가 있어야 열리고\n지금은 <b>??? (근거 단서 부족)</b>. 언제나 고를 수 있는 건 '잘 모르겠다'(= 실패)뿐입니다.");
         board.Open();
         yield return 5f;
         board.Close();
@@ -257,9 +257,9 @@ public static class CrimeSceneDemo
         timer.SetRemaining(5f);
         yield return 6.5f;
 
-        Say("⑥ 추리는 질문마다 <b>한 번만</b>. 일부러 틀려 봅니다: '강도가 들었다'.\n틀려도 진행은 막히지 않고, <b>다음 사건의 큰 오류</b>로 기록됩니다.");
+        Say("⑥ 추리는 질문마다 <b>한 번만</b>. 일부러 '잘 모르겠다'를 골라 봅니다 (= 실패).\n실패여도 진행은 막히지 않고, <b>다음 사건의 큰 오류</b>로 기록됩니다.");
         yield return 4.5f;
-        board.Choose(0);
+        board.Choose(3);
         yield return 4f;
 
         Say("⑥ 여동생이 찾은 <b>손톱 밑 섬유</b>를 근거로 '아빠'를 고릅니다.\n(누가 찾았든 사건 파일에 근거가 있으면 남매 누구나 고를 수 있음 — 여동생이 오빠에게 알려 주면 되니까)");

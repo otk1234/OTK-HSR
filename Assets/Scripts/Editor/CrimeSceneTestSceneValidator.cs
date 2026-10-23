@@ -72,6 +72,8 @@ public static class CrimeSceneTestSceneValidator
             foreach (CaseDeduction.Question q in board.deduction.questions)
             {
                 if (!q.options.Any(o => o.correct)) problems.Add($"추리 '{q.id}': 정답 없음");
+                if (q.options.Count(o => o.needAnyClue == null || o.needAnyClue.Length == 0) != 1 || q.options.Any(o => o.correct && (o.needAnyClue == null || o.needAnyClue.Length == 0)))
+                    problems.Add($"추리 '{q.id}': 언제나 고를 수 있는 선택지는 '잘 모르겠다'(오답) 하나여야 함");
                 foreach (CaseDeduction.Option o in q.options)
                     foreach (string id in o.needAnyClue)
                         if (!clueIds.Contains(id)) problems.Add($"추리 '{q.id}': 씬에 없는 단서 {id}");
@@ -285,20 +287,24 @@ public static class CrimeSceneTestSceneValidator
               && !brother.GetComponent<PlayerInteractor3D>().enabled, "추리 창이 열리면 이동·전환·조사 잠김");
         Check(board.CurrentQuestion.id == "relation" && !board.Choose(1) && !CaseState.HasAnswered(data.caseId, "relation"),
             "근거 단서(찻잔·상처)가 없으면 '아는 사이' 선택지를 고를 수 없음");
-        Check(board.Choose(0) && CaseState.TryGet(data.caseId, "relation", out CaseState.Answer wrong) && !wrong.correct && CaseState.NextCaseErrors.Count == 1,
-            "오답도 진행됨 → 다음 사건 큰 오류로 기록");
+        Check(!board.Choose(0) && !board.Choose(2) && !CaseState.HasAnswered(data.caseId, "relation"),
+            "오답 선택지도 근거(핏자국·재떨이)가 없으면 잠김 → 잠김 표시가 정답 힌트가 아님");
+        Check(board.VisibleOptions(data.Find("relation"))[3].text == CaseDeduction.UnknownOptionText
+              && board.Choose(3) && CaseState.TryGet(data.caseId, "relation", out CaseState.Answer wrong) && !wrong.correct && CaseState.NextCaseErrors.Count == 1,
+            "단서가 부족하면 '잘 모르겠다'만 고를 수 있음 → 오답(실패)으로 진행, 다음 사건 큰 오류로 기록");
         CaseDeduction.Question relation = data.Find("relation");
         Check(!CaseState.Record(data.caseId, relation, relation.options[2], CharacterType.Player2) && board.CurrentQuestion.id == "culprit",
             "한 번 답한 질문은 바꿀 수 없음 → 다음 질문");
         CaseDeduction.Question culprit = data.Find("culprit");
         List<CaseDeduction.Option> options = board.VisibleOptions(culprit);
-        Check(options.Count == 4 && options[1].needAnyClue.Contains("navy_fiber") && options[1].Unlocked && options[2].Unlocked,
-            "선택지는 누가 추리하든 같음: 섬유·녹화 영상 근거 선택지 둘 다 보이고 고를 수 있음");
+        Check(options.Count == 5 && options[1].needAnyClue.Contains("navy_fiber") && options[1].Unlocked && options[2].Unlocked
+              && !options[0].Unlocked && !options[3].Unlocked && options[4].Unlocked,
+            "선택지는 누가 추리하든 같음: 섬유·녹화 영상 근거 선택지 둘 다 열림 (근거 없는 오답 2개는 잠김, '잘 모르겠다'는 열림)");
         Check(board.Choose(1) && CaseState.TryGet(data.caseId, "culprit", out CaseState.Answer culpritAnswer) && culpritAnswer.correct && culpritAnswer.answeredBy == CharacterType.Player2,
             "여동생이 찾은 섬유를 근거로 오빠가 '아빠' 정답 (답한 사람 = 오빠로 기록)");
         Check(board.Choose(0) && board.CurrentQuestion == null && CaseState.Answers.Count == 3, "수첩 근거로 다음 범행 정답 → 추리 완료");
         string screen = board.ScreenText();
-        Check(screen.Contains("추리 완료") && screen.Contains(relation.options[0].text) && !screen.Contains("정답") && !screen.Contains("오답"),
+        Check(screen.Contains("추리 완료") && screen.Contains(CaseDeduction.UnknownOptionText) && !screen.Contains("정답") && !screen.Contains("오답"),
             "추리 창에는 고른 답만 보이고 정답·오답은 보이지 않음");
         board.Close();
         yield return 0.2f;
