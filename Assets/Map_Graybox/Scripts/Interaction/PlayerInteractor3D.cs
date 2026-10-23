@@ -110,7 +110,7 @@ namespace NarrativeGraybox.Interaction
         public bool CollectSelected()
         {
             if(selected==null||!selected.Collectible)return false;
-            if(!hud.TryAddItem(selected.Title)){notice="소지품이 가득 찼습니다. (5 / 5)";return false;}
+            if(!hud.TryAddItem(selected.Title)){notice=hud.InventoryFullMessage;return false;} // [OTK 통합] 캐릭터 칸 수 기준 문구
             notice=selected.Title+" 획득";selected.SetHover(false);selected.gameObject.SetActive(false);selected=null;hovered=null;
             return true;
         }

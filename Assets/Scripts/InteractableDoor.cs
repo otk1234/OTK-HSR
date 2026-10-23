@@ -10,7 +10,7 @@ public enum DoorState { Closed, Open, Locked, Broken }
 public class InteractableDoor : MonoBehaviour
 {
     [Header("필요한 아이템 (빈칸이면 그냥 열림)")]
-    public string requiredItemName = "GoldKey";
+    public string requiredItemName = "";
 
     [Header("메시지 설정")]
     public string lockedMessage = "굳게 잠겨 있다.";

@@ -284,7 +284,7 @@ public static class CrimeSceneDemo
         planner.Choose(InterventionKind.Abet);
         yield return 4.5f;
 
-        var hideBody = Object.FindObjectsByType<Intervention>(FindObjectsSortMode.None).First(i => i.kind == InterventionKind.Abet);
+        var hideBody = Object.FindObjectsByType<Intervention>().First(i => i.kind == InterventionKind.Abet);
         Say($"⑦ 누구나 할 수 있지만 <b>능력에 따라 시간이 다름</b>: 시체 옮기기는\n오빠 {hideBody.WorkTimeFor(CharacterType.Player2)}초 · 여동생 {hideBody.WorkTimeFor(CharacterType.Player1)}초. 오빠가 옮깁니다.");
         brother.GetComponent<NavMeshAgent>().Warp(new Vector3(-3.6f, 0f, -2.3f));
         manager.SwitchInstant(1);

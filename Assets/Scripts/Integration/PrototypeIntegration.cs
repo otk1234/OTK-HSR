@@ -73,7 +73,7 @@ public class PrototypeIntegration : MonoBehaviour
 
     void Start()
     {
-        rooms = FindObjectsByType<CameraTrigger>(FindObjectsSortMode.None);
+        rooms = FindObjectsByType<CameraTrigger>();
         hud.AddItemHandler = AddToActiveInventory;
         inspectionCamera.enabled = false;
 
@@ -160,7 +160,7 @@ public class PrototypeIntegration : MonoBehaviour
         overviewOffsets.Clear();
         overviewVelocities.Clear();
 
-        if (rooms == null) rooms = FindObjectsByType<CameraTrigger>(FindObjectsSortMode.None);
+        if (rooms == null) rooms = FindObjectsByType<CameraTrigger>();
         GameObject active = CharacterManager.instance == null ? null : CharacterManager.instance.GetActivePlayer();
         if (active == null) return;
 
@@ -268,10 +268,17 @@ public class PrototypeIntegration : MonoBehaviour
     }
 
     // 조사로 얻은 아이템(황동 열쇠 등)은 조작 중인 캐릭터의 인벤토리로 들어갑니다.
+    // 가득 차면 바닥 줍기와 같은 문구 + 그 캐릭터의 칸 수 (예: 오빠 6 / 6)
     bool AddToActiveInventory(string itemName)
     {
-        return CharacterManager.instance.GetActivePlayer().GetComponent<Inventory>().TryAddItem(itemName);
+        Inventory inventory = CharacterManager.instance.GetActivePlayer().GetComponent<Inventory>();
+        if (inventory.TryAddItem(itemName)) return true;
+        hud.InventoryFullMessage = FullMessageFor(inventory);
+        return false;
     }
+
+    static string FullMessageFor(Inventory inventory) =>
+        $"{Inventory.FullMessage} ({inventory.items.Count} / {inventory.Capacity})";
 
     public Objective CurrentObjective()
     {

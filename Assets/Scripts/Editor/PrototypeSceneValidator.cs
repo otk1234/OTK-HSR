@@ -27,16 +27,16 @@ public static class PrototypeSceneValidator
     {
         var problems = new List<string>();
 
-        foreach (GameObject go in Object.FindObjectsByType<GameObject>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+        foreach (GameObject go in Object.FindObjectsByType<GameObject>(FindObjectsInactive.Include))
         {
             int missing = GameObjectUtility.GetMonoBehavioursWithMissingScriptCount(go);
             if (missing > 0) problems.Add($"빠진 스크립트 {missing}개: {go.name}");
         }
 
-        var manager = Object.FindFirstObjectByType<CharacterManager>();
+        var manager = Object.FindAnyObjectByType<CharacterManager>();
         if (manager == null || manager.players == null || manager.players.Length != 2) problems.Add("CharacterManager 캐릭터 2명 설정 안 됨");
-        if (Object.FindFirstObjectByType<PrototypeIntegration>() == null) problems.Add("PrototypeIntegration 없음");
-        if (Object.FindFirstObjectByType<FadeManager>() == null) problems.Add("FadeManager 없음");
+        if (Object.FindAnyObjectByType<PrototypeIntegration>() == null) problems.Add("PrototypeIntegration 없음");
+        if (Object.FindAnyObjectByType<FadeManager>() == null) problems.Add("FadeManager 없음");
 
         if (manager != null && manager.players.Length > 0)
         {
@@ -45,7 +45,7 @@ public static class PrototypeSceneValidator
                 problems.Add("시작 위치가 NavMesh 위에 없음");
             else
             {
-                foreach (CameraTrigger room in Object.FindObjectsByType<CameraTrigger>(FindObjectsSortMode.None))
+                foreach (CameraTrigger room in Object.FindObjectsByType<CameraTrigger>())
                 {
                     // 가구 위가 아닌 바닥 지점 중 하나라도 걸어서 갈 수 있으면 통과
                     Bounds area = room.GetComponent<Collider>().bounds;
@@ -132,13 +132,13 @@ public static class PrototypeSceneValidator
     {
         var manager = CharacterManager.instance;
         GameObject sister = manager.players[0], brother = manager.players[1];
-        var integration = Object.FindFirstObjectByType<PrototypeIntegration>();
-        var brain = Object.FindFirstObjectByType<CinemachineBrain>();
-        var inspectionCamera = Object.FindFirstObjectByType<IsometricCameraFollow>();
-        var doors = Object.FindObjectsByType<InteractableDoor>(FindObjectsSortMode.None);
+        var integration = Object.FindAnyObjectByType<PrototypeIntegration>();
+        var brain = Object.FindAnyObjectByType<CinemachineBrain>();
+        var inspectionCamera = Object.FindAnyObjectByType<IsometricCameraFollow>();
+        var doors = Object.FindObjectsByType<InteractableDoor>();
         InteractableDoor storageDoor = doors.First(d => d.requiredItemName == "황동 열쇠");
         InteractableDoor pantryDoor = doors.First(d => d.requiredItemName == "공구 상자");
-        CameraTrigger Room(string name) => Object.FindObjectsByType<CameraTrigger>(FindObjectsSortMode.None).First(r => r.roomName == name);
+        CameraTrigger Room(string name) => Object.FindObjectsByType<CameraTrigger>().First(r => r.roomName == name);
 
         Check(manager.GetActivePlayer() == sister, "시작 캐릭터 = 여동생");
         Check(sister.name.StartsWith(CharacterRoster.NameOf(CharacterType.Player1)) && brother.name.StartsWith(CharacterRoster.NameOf(CharacterType.Player2))
@@ -166,7 +166,7 @@ public static class PrototypeSceneValidator
 
         // 서재 조사 → 황동 열쇠
         var interactor = sister.GetComponent<PlayerInteractor3D>();
-        var area = Object.FindFirstObjectByType<InspectionArea>();
+        var area = Object.FindObjectsByType<InspectionArea>().First(a => a.Items.Any(i => i.Title == "황동 열쇠"));
         interactor.Enter(area);
         yield return 0.3f;
         Check(!brain.enabled && inspectionCamera.enabled, "조사 중엔 팀원 클로즈업 카메라로 전환");
@@ -210,7 +210,7 @@ public static class PrototypeSceneValidator
         var storagePath = new NavMeshPath();
         NavMesh.CalculatePath(foyer, storageInside, NavMesh.AllAreas, storagePath);
         Check(storagePath.status == NavMeshPathStatus.PathComplete, "창고 문이 열린 뒤 창고까지 걸어갈 수 있음");
-        var box = Object.FindObjectsByType<InteractableItem>(FindObjectsSortMode.None).First(i => i.itemName == "공구 상자");
+        var box = Object.FindObjectsByType<InteractableItem>().First(i => i.itemName == "공구 상자");
         Check(box.requiredTrait == CharacterTrait.Strength && box.CanPickUp(CharacterType.Player2) && !box.CanPickUp(CharacterType.Player1),
             "공구 상자는 힘 특성(오빠)만 들 수 있음");
         box.PickUp(brother.GetComponent<Inventory>());
@@ -227,11 +227,26 @@ public static class PrototypeSceneValidator
         Check(pantryPath.status == NavMeshPathStatus.PathComplete, "다용도실 문이 열린 뒤 걸어갈 수 있음");
 
         // 암호 메모 (여동생만) → 목표 달성
-        var memo = Object.FindObjectsByType<InteractableItem>(FindObjectsSortMode.None).First(i => i.itemName == "암호 메모");
+        var memo = Object.FindObjectsByType<InteractableItem>().First(i => i.itemName == "암호 메모");
         Check(memo.requiredTrait == CharacterTrait.Investigation && memo.CanPickUp(CharacterType.Player1) && !memo.CanPickUp(CharacterType.Player2),
             "암호 메모는 정보 수집 특성(여동생)만 읽을 수 있음");
         memo.PickUp(sister.GetComponent<Inventory>());
         yield return 0.3f;
         Check(integration.CurrentObjective() == null, "모든 목표 완료");
+
+        // 소지품이 가득 차면 조사로 얻기도 거절 + 바닥 줍기와 같은 문구 + 그 캐릭터의 칸 수
+        foreach (int index in new[] { 1, 0 })
+        {
+            typeof(CharacterManager).GetMethod("SwitchPlayer", BindingFlags.NonPublic | BindingFlags.Instance).Invoke(manager, new object[] { index });
+            yield return 0.2f;
+            Inventory inventory = manager.players[index].GetComponent<Inventory>();
+            int heldBefore = inventory.items.Count;
+            while (inventory.TryAddItem("점검용 물건")) { }
+            string expected = $"{Inventory.FullMessage} ({inventory.Capacity} / {inventory.Capacity})";
+            Check(!integration.hud.TryAddItem("점검용 추가 물건") && integration.hud.InventoryFullMessage == expected
+                  && inventory.items.Count == inventory.Capacity,
+                $"{integration.NameFor(index)}: 가득 차면 조사로 얻기 거절, 문구 '{integration.hud.InventoryFullMessage}'");
+            inventory.items.RemoveRange(heldBefore, inventory.items.Count - heldBefore);
+        }
     }
 }

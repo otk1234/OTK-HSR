@@ -48,6 +48,7 @@ namespace NarrativeGraybox.UI
 
         // [OTK 통합] 외부 게임 시스템(캐릭터별 인벤토리, 알림)과 연결 --------------------
         public System.Func<string, bool> AddItemHandler; // 설정되면 획득 아이템을 이쪽으로 넘긴다.
+        public string InventoryFullMessage = "소지품이 가득 찼습니다. (5 / 5)"; // [OTK 통합] 가득 참 문구 (연결 쪽에서 캐릭터 칸 수로 바꿔 줌)
         private string toastMessage = string.Empty;
         private float toastUntil;
         public void SetCharacter(string value) => character = value;
@@ -68,7 +69,7 @@ namespace NarrativeGraybox.UI
             if (AddItemHandler != null) // [OTK 통합]
             {
                 bool added = AddItemHandler(itemName);
-                ShowMessage(added ? itemName + "을(를) 획득했다." : "소지품이 가득 찼다.");
+                ShowMessage(added ? itemName + "을(를) 획득했다." : InventoryFullMessage); // [OTK 통합] 가득 참 문구 통일
                 return added;
             }
             for (int i = 0; i < inventory.Length; i++)

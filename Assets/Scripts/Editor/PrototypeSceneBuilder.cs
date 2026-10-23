@@ -106,11 +106,11 @@ public static class PrototypeSceneBuilder
 
         var scene = EditorSceneManager.OpenScene(TargetScene, OpenSceneMode.Single);
 
-        Camera mainCamera = Object.FindObjectsByType<Camera>(FindObjectsSortMode.None).First(c => c.CompareTag("MainCamera"));
-        var hud = Object.FindFirstObjectByType<SimpleGameHud>();
+        Camera mainCamera = Object.FindObjectsByType<Camera>().First(c => c.CompareTag("MainCamera"));
+        var hud = Object.FindAnyObjectByType<SimpleGameHud>();
         var inspectionCamera = mainCamera.GetComponent<IsometricCameraFollow>();
         var occlusionFader = mainCamera.GetComponent<CameraOcclusionFader>();
-        GameObject teammatePlayer = Object.FindFirstObjectByType<PlayerInteractor3D>().gameObject;
+        GameObject teammatePlayer = Object.FindAnyObjectByType<PlayerInteractor3D>().gameObject;
 
         // 1) NavMesh: 캐릭터를 빼고 맵(바닥·벽·가구)만 굽습니다. 문·아이템은 굽고 난 뒤에 만듭니다.
         teammatePlayer.SetActive(false);
@@ -144,7 +144,7 @@ public static class PrototypeSceneBuilder
         Material timber = LoadMaterial("DemoTimber");
         Material paper = LoadMaterial("Clue");
 
-        InspectionItem key = Object.FindObjectsByType<InspectionItem>(FindObjectsSortMode.None).First(i => i.Title == "황동 열쇠");
+        InspectionItem key = Object.FindObjectsByType<InspectionItem>().First(i => i.Title == "황동 열쇠");
         key.Collectible = true;
         key.Description = "작은 황동 열쇠. 손잡이에 '창고'라고 새겨져 있다.";
         EditorUtility.SetDirty(key);

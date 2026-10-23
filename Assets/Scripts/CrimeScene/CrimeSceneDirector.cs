@@ -59,7 +59,7 @@ public class CrimeSceneDirector : MonoBehaviour
             text.AppendLine($"개입 방향: {Intervention.KindName(direction)}{done}");
             extra++;
         }
-        foreach (CharacterInteractable work in FindObjectsByType<CharacterInteractable>(FindObjectsSortMode.None))
+        foreach (CharacterInteractable work in FindObjectsByType<CharacterInteractable>())
             if (work.Busy) { text.AppendLine($"<color=#ffd966>{work.displayName} {work.ActionName}... {work.Progress:P0}</color>"); extra++; }
 
         var box = new Rect(Screen.width - 268, 150, 256, 96 + (CaseFile.Entries.Count + extra) * 17);
