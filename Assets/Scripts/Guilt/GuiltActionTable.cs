@@ -62,6 +62,8 @@ public class GuiltActionTable : ScriptableObject
             new Entry { id = "incite_crime", description = "범죄를 종용하기", amount = 5 },
             new Entry { id = "abet_crime", description = "범죄에 가담하기", amount = 8 },
             new Entry { id = "prevent_crime", description = "이어질 범죄를 막기", amount = -5 },
+            // 오빠의 강제로 열기 (조사를 위해 따는 것일 수도 있으므로 작게, 사용자 결정 2026-10-23)
+            new Entry { id = "force_entry", description = "잠긴 문을 강제로 열기", amount = 2 },
         };
     }
 

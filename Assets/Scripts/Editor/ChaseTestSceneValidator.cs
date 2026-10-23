@@ -359,6 +359,8 @@ public static class ChaseTestSceneValidator
         closet.Exit(p1);
         yield return closet.exitTime + 0.2f;
         Check(!p1.IsHidden && !move1.Locks.Has(LockReason.Hiding) && p1.GetComponentsInChildren<Renderer>().Any(r => r.enabled), "나오면 다시 보이고 움직일 수 있음");
+        Check(underBed.onlyFor == CharacterType.Player1 && !underBed.Allows(p2) && !underBed.TryEnter(p2) && underBed.Allows(p1),
+            "침대 밑은 여동생만 (오빠는 몸이 커서 못 들어감)");
         Check(underBed.capacity == 1 && underBed.TryEnter(p1) && !underBed.CanEnter(p1), "침대 밑은 1인용");
         yield return underBed.enterTime + 0.2f;
         underBed.Exit(p1);

@@ -58,7 +58,7 @@ public class PlayerInteraction : MonoBehaviour
 
         if (nearbyItem != null) GameMessage.Prompt($"[E] {nearbyItem.itemName} 줍기");
         else if (InteractableReady) GameMessage.Prompt(nearbyInteractable.Prompt);
-        else if (hidingFirst) GameMessage.Prompt(nearbyHidingSpot.CanEnter(status) ? $"[E] {nearbyHidingSpot.displayName}에 숨기" : $"{nearbyHidingSpot.displayName}: 자리가 없다");
+        else if (hidingFirst) GameMessage.Prompt(nearbyHidingSpot.CanEnter(status) || !nearbyHidingSpot.Allows(status) ? $"[E] {nearbyHidingSpot.displayName}에 숨기" : $"{nearbyHidingSpot.displayName}: 자리가 없다");
         else if (nearbyDoor != null) GameMessage.Prompt(DoorPrompt());
 
         if (Input.GetKeyDown(KeyCode.E))
@@ -89,7 +89,8 @@ public class PlayerInteraction : MonoBehaviour
 
             else if (hidingFirst)
             {
-                if (status != null) nearbyHidingSpot.TryEnter(status);
+                if (status != null && !nearbyHidingSpot.Allows(status)) GameMessage.Show(nearbyHidingSpot.notForMessage);
+                else if (status != null) nearbyHidingSpot.TryEnter(status);
             }
 
             else if (nearbyDoor != null)

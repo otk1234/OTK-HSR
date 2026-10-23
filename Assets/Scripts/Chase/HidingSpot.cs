@@ -26,6 +26,10 @@ public class HidingSpot : MonoBehaviour
     [Tooltip("숨어 있어도 추격자가 이 거리 안으로 들어오면 바로 들킴 (0 = 직접 뒤져야만 발견). 커튼처럼 허술한 곳용")]
     public float exposedWithin = 0f;
 
+    [Header("숨을 수 있는 캐릭터 (All = 누구나). 예: 침대 밑은 몸이 큰 오빠는 못 들어감")]
+    public CharacterType onlyFor = CharacterType.All;
+    [TextArea] public string notForMessage = "몸이 커서 들어갈 수 없다...";
+
     private readonly List<CharacterStatus> occupants = new List<CharacterStatus>();
     private readonly HashSet<CharacterStatus> moving = new HashSet<CharacterStatus>();
     private readonly HashSet<Object> witnesses = new HashSet<Object>();
@@ -38,7 +42,11 @@ public class HidingSpot : MonoBehaviour
     void OnDisable() { All.Remove(this); }
 
     public bool CanEnter(CharacterStatus who) =>
-        who != null && !who.IsHidden && !who.IsCaught && occupants.Count + moving.Count < capacity;
+        who != null && Allows(who) && !who.IsHidden && !who.IsCaught && occupants.Count + moving.Count < capacity;
+
+    // 이 캐릭터가 들어갈 수 있는 곳인가 (자리와 상관없이)
+    public bool Allows(CharacterStatus who) =>
+        who != null && CharacterRoster.CanUse(CharacterRoster.TypeOf(who.gameObject), onlyFor, CharacterTrait.None);
 
     // 숨거나 나오는 동작 중인가
     public bool IsBusy(CharacterStatus who) => moving.Contains(who);

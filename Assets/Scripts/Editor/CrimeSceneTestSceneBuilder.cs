@@ -266,50 +266,58 @@ public static class CrimeSceneTestSceneBuilder
             new Vector3(-3.6f, 0.13f, -3.4f), new Vector3(0.95f, 0.26f, 0.5f), clothesMat);
         Visual(torso.transform.parent, "다리", new Vector3(-4.55f, 0.1f, -3.25f), new Vector3(0.95f, 0.2f, 0.42f), clothesMat);
         Visual(torso.transform.parent, "팔", new Vector3(-3.4f, 0.08f, -2.95f), new Vector3(0.7f, 0.14f, 0.16f), skinMat);
-        Item(body, "head_wound", "뒤통수의 상처",
-            "둔기로 한 번 강하게 맞은 상처. 몸싸움이나 저항한 흔적은 없다. 등을 보일 만큼 아는 사람이었을까.",
-            new Vector3(-2.95f, 0.14f, -3.4f), new Vector3(0.3f, 0.26f, 0.3f), skinMat, PrimitiveType.Sphere);
-        Item(body, "navy_fiber", "손톱 밑 섬유",
-            "손톱 밑에 남색 털실이 끼어 있다. ...아빠의 남색 외투와 같은 색이다.",
-            new Vector3(-3.05f, 0.09f, -2.95f), new Vector3(0.12f, 0.05f, 0.12f), fiberMat, visibleTo: CharacterTrait.Investigation);
+        // 설명 = 누구나 보는 사실, Insight(...) = 여동생의 통찰 (일부는 추리 근거로 기록, 사용자 결정 2026-10-23)
+        Insight(Item(body, "head_wound", "뒤통수의 상처",
+            "둔기로 한 번 강하게 맞은 상처. 몸싸움이나 저항한 흔적은 없다.",
+            new Vector3(-2.95f, 0.14f, -3.4f), new Vector3(0.3f, 0.26f, 0.3f), skinMat, PrimitiveType.Sphere),
+            "등을 보일 만큼 믿은 사람이었다. 아는 사이다.", AcquaintanceEvidence, AcquaintanceTitle);
+        Insight(Item(body, "navy_fiber", "손톱 밑 섬유",
+            "손톱 밑에 남색 털실이 끼어 있다.",
+            new Vector3(-3.05f, 0.09f, -2.95f), new Vector3(0.12f, 0.05f, 0.12f), fiberMat, visibleTo: CharacterTrait.Investigation),
+            "...아빠의 남색 외투와 같은 색이다.");
         Visual(root, "피 웅덩이", new Vector3(-2.6f, 0.012f, -3.5f), new Vector3(1.1f, 0.004f, 0.9f), bloodMat, PrimitiveType.Cylinder);
 
         // 이어진 핏자국: 시체 옆 → 욕실 문 (조사 지점은 문 트리거와 겹치지 않게 문에서 떨어뜨림)
         InspectionArea trail = Area(root, "핏자국", new Vector3(-1.2f, 0f, -1.3f), Vector3.back, 1.8f);
-        Item(trail, "blood_trail", "이어진 핏자국",
-            "시체 옆에서 욕실 쪽으로 핏방울이 이어진다. 범인이 피 묻은 손으로 욕실에 간 것 같다.",
-            new Vector3(-1.1f, 0.012f, -1.15f), new Vector3(0.35f, 0.006f, 0.35f), bloodMat, PrimitiveType.Cylinder);
+        Insight(Item(trail, "blood_trail", "이어진 핏자국",
+            "시체 옆에서 욕실 쪽으로 핏방울이 이어진다.",
+            new Vector3(-1.1f, 0.012f, -1.15f), new Vector3(0.35f, 0.006f, 0.35f), bloodMat, PrimitiveType.Cylinder),
+            "범인이 피 묻은 손으로 욕실에 간 것 같다.");
         Vector3[] drops = { new(-2.2f, 0f, -2.8f), new(-1.8f, 0f, -2.2f), new(-1.45f, 0f, -1.65f), new(-0.6f, 0f, -0.4f), new(-0.2f, 0f, 0.3f) };
         foreach (Vector3 d in drops)
             Visual(root, "핏방울", d + Vector3.up * 0.011f, new Vector3(0.22f, 0.004f, 0.22f), bloodMat, PrimitiveType.Cylinder);
 
         // 흉기: 깨진 유리 재떨이 (거실 탁자 옆 바닥)
         InspectionArea weapon = Area(root, "깨진 재떨이", new Vector3(-5.2f, 0f, -1.9f), Vector3.back, 1.4f);
-        Item(weapon, "weapon_ashtray", "깨진 유리 재떨이",
-            "묵직한 유리 재떨이가 깨져 있다. 모서리에 피와 머리카락이 묻어 있다. 흉기다.",
-            new Vector3(-5.2f, 0.05f, -1.9f), new Vector3(0.32f, 0.08f, 0.32f), glassMat, PrimitiveType.Cylinder);
+        Insight(Item(weapon, "weapon_ashtray", "깨진 유리 재떨이",
+            "묵직한 유리 재떨이가 깨져 있다. 모서리에 피와 머리카락이 묻어 있다.",
+            new Vector3(-5.2f, 0.05f, -1.9f), new Vector3(0.32f, 0.08f, 0.32f), glassMat, PrimitiveType.Cylinder),
+            "흉기다. 집에 있던 물건을 집어 들었다.");
         Visual(root, "재떨이 조각", new Vector3(-4.95f, 0.02f, -1.7f), new Vector3(0.12f, 0.03f, 0.08f), glassMat);
         Visual(root, "재떨이 조각", new Vector3(-5.4f, 0.02f, -1.65f), new Vector3(0.08f, 0.03f, 0.1f), glassMat);
 
         // 식탁 위 찻잔 두 개
         InspectionArea table = Area(root, "식탁", new Vector3(4.4f, 0.8f, -3f), Vector3.back, 1.5f);
-        Item(table, "two_cups", "찻잔 두 개",
-            "찻잔 두 개. 하나는 반쯤 남았다. 피해자는 범인에게 차를 대접했다. 아는 사이였다.",
-            new Vector3(4.15f, 0.86f, -3f), new Vector3(0.14f, 0.1f, 0.14f), cupMat, PrimitiveType.Cylinder);
+        Insight(Item(table, "two_cups", "찻잔 두 개",
+            "찻잔 두 개. 하나는 반쯤 남았다.",
+            new Vector3(4.15f, 0.86f, -3f), new Vector3(0.14f, 0.1f, 0.14f), cupMat, PrimitiveType.Cylinder),
+            "피해자는 범인에게 차를 대접했다. 아는 사이였다.", AcquaintanceEvidence, AcquaintanceTitle);
         Visual(root, "찻잔", new Vector3(4.65f, 0.86f, -2.85f), new Vector3(0.14f, 0.1f, 0.14f), cupMat, PrimitiveType.Cylinder);
 
         // 욕조에 버린 피 묻은 수건
         InspectionArea tub = Area(root, "욕조", new Vector3(2.2f, 0.55f, 4.4f), Vector3.left, 1.6f);
-        Item(tub, "bloody_towel", "피 묻은 수건",
-            "피를 닦아 낸 수건이 욕조에 버려져 있다. 범인은 서두르지 않고 손을 씻고 나갔다.",
-            new Vector3(2.2f, 0.58f, 4.2f), new Vector3(0.6f, 0.06f, 0.4f), towelMat);
+        Insight(Item(tub, "bloody_towel", "피 묻은 수건",
+            "피를 닦아 낸 수건이 욕조에 버려져 있다.",
+            new Vector3(2.2f, 0.58f, 4.2f), new Vector3(0.6f, 0.06f, 0.4f), towelMat),
+            "범인은 서두르지 않고 손을 씻고 나갔다.");
         Visual(root, "수건 핏자국", new Vector3(2.15f, 0.615f, 4.15f), new Vector3(0.25f, 0.01f, 0.2f), bloodMat);
 
         // 책장 뒤 바닥의 피해자 수첩 → 오빠가 책장을 밀어야 보임
         InspectionArea behindShelf = Area(root, "책장 뒤 바닥", new Vector3(-7.4f, 0f, 3.2f), Vector3.right, 1.4f);
-        Item(behindShelf, "victim_diary", "피해자 수첩",
-            "책장과 벽 사이에 떨어진 수첩. 마지막 장: '목요일 밤 9시, 박 선생 댁. 그 일을 털어놓을 것.' 다음은 박 선생일지도 모른다.",
-            new Vector3(-7.45f, 0.03f, 3.2f), new Vector3(0.22f, 0.04f, 0.3f), paperMat);
+        Insight(Item(behindShelf, "victim_diary", "피해자 수첩",
+            "책장과 벽 사이에 떨어진 수첩. 마지막 장: '목요일 밤 9시, 박 선생 댁. 그 일을 털어놓을 것.'",
+            new Vector3(-7.45f, 0.03f, 3.2f), new Vector3(0.22f, 0.04f, 0.3f), paperMat),
+            "다음은 박 선생일지도 모른다.");
         behindShelf.gameObject.SetActive(false);
 
         HeavyObject shelf = BuildHeavyObject(root, "책장", new Vector3(-7.45f, 0f, 3.2f), new Vector3(0.5f, 1.8f, 1.6f), new Vector3(0f, 0f, 1.7f));
@@ -317,9 +325,10 @@ public static class CrimeSceneTestSceneBuilder
 
         // 고장 난 인터폰 녹화기 → 오빠가 고쳐야 녹화 영상을 볼 수 있음
         InspectionArea video = Area(root, "인터폰 녹화 영상", new Vector3(7.75f, 1.3f, 3.5f), Vector3.left, 0.9f, height: 0.4f, distance: 2.2f);
-        Item(video, "intercom_video", "녹화 영상",
-            "오늘 밤 8시 40분. 모자를 눌러쓴 남색 외투의 남자가 들어온다. 걸음걸이가... 아빠와 똑같다.",
-            new Vector3(7.77f, 1.3f, 3.5f), new Vector3(0.03f, 0.26f, 0.36f), cupMat);
+        Insight(Item(video, "intercom_video", "녹화 영상",
+            "오늘 밤 8시 40분. 모자를 눌러쓴 남색 외투의 남자가 들어온다.",
+            new Vector3(7.77f, 1.3f, 3.5f), new Vector3(0.03f, 0.26f, 0.36f), cupMat),
+            "걸음걸이가... 아빠와 똑같다.", GaitEvidence, GaitTitle);
         video.gameObject.SetActive(false);
 
         RepairableMachine recorder = BuildMachine(root, "인터폰 녹화기", new Vector3(7.85f, 1.3f, 3.5f));
@@ -461,6 +470,22 @@ public static class CrimeSceneTestSceneBuilder
         clue.visibleToTrait = visibleTo;
 
         area.Items = area.Items.Concat(new[] { item }).ToArray();
+        return item;
+    }
+
+    // 여동생 통찰로만 얻는 추리 근거 (Case302_Deduction의 정답 근거)
+    public const string AcquaintanceEvidence = "insight_acquaintance", AcquaintanceTitle = "통찰: 아는 사이";
+    public const string GaitEvidence = "insight_gait", GaitTitle = "통찰: 아빠의 걸음걸이";
+
+    // 조사 항목에 통찰 문장(+ 근거)을 붙임
+    static InspectionItem Insight(InspectionItem item, string text, string evidenceId = null, string evidenceTitle = null)
+    {
+        var insight = item.gameObject.AddComponent<TraitInsight>();
+        insight.requiredTrait = CharacterTrait.Insight;
+        insight.label = "통찰";
+        insight.extraText = text;
+        insight.evidenceId = evidenceId;
+        insight.evidenceTitle = evidenceTitle;
         return item;
     }
 

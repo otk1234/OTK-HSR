@@ -16,4 +16,6 @@ MonoBehaviour:
   displayName: "\uC5EC\uB3D9\uC0DD"
   age: 21
   inventoryCapacity: 5
-  traits: 1
+  traits: 25
+  footstepMultiplier: 0.75
+  staminaMultiplier: 0.85

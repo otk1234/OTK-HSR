@@ -85,6 +85,12 @@ public static class CharacterProfileValidator
         Check(sister.Has(CharacterTrait.Investigation) && !brother.Has(CharacterTrait.Investigation), "정보 수집 = 여동생만");
         Check(brother.Has(CharacterTrait.Strength) && !sister.Has(CharacterTrait.Strength), "힘 = 오빠만");
         Check(brother.Has(CharacterTrait.Mechanics) && !sister.Has(CharacterTrait.Mechanics), "기계 조작 = 오빠만");
+        Check(sister.Has(CharacterTrait.Insight) && sister.Has(CharacterTrait.Persuasion) && !brother.Has(CharacterTrait.Insight) && !brother.Has(CharacterTrait.Persuasion),
+            "통찰·화술 = 여동생만");
+        Check(sister.footstepMultiplier < 1f && Mathf.Approximately(brother.footstepMultiplier, 1f),
+            $"여동생은 가벼운 몸, 오빠 발소리는 기본 ({sister.footstepMultiplier} / {brother.footstepMultiplier})");
+        Check(brother.staminaMultiplier > 1f && sister.staminaMultiplier < 1f,
+            $"체력: 오빠 > 기본 > 여동생 ({sister.staminaMultiplier} / {brother.staminaMultiplier})");
 
         Check(CharacterRoster.CanUse(CharacterType.Player1, CharacterType.All, CharacterTrait.None)
               && CharacterRoster.CanUse(CharacterType.Player2, CharacterType.All, CharacterTrait.None), "조건 없음 → 누구나");

@@ -27,7 +27,8 @@ public class FootstepNoise : MonoBehaviour
         if (Time.time < nextStep) return;
 
         bool running = movement.IsRunning;
-        NoiseSystem.Emit(transform.position, running ? runRadius : walkRadius, running ? NoiseKind.Run : NoiseKind.Footstep, gameObject);
+        float radius = (running ? runRadius : walkRadius) * CharacterRoster.FootstepMultiplierOf(gameObject); // 가벼운 몸이면 작게 (프로필)
+        NoiseSystem.Emit(transform.position, radius, running ? NoiseKind.Run : NoiseKind.Footstep, gameObject);
         nextStep = Time.time + (running ? runInterval : walkInterval);
     }
 }

@@ -81,3 +81,7 @@ MonoBehaviour:
     description: "\uC774\uC5B4\uC9C8 \uBC94\uC8C4\uB97C \uB9C9\uAE30"
     amount: -5
     oncePerChapter: 1
+  - id: force_entry
+    description: "\uC7A0\uAE34 \uBB38\uC744 \uAC15\uC81C\uB85C \uC5F4\uAE30"
+    amount: 2
+    oncePerChapter: 1

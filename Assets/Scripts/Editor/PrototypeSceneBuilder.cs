@@ -151,6 +151,8 @@ public static class PrototypeSceneBuilder
 
         InteractableDoor storageDoor = BuildDoor("창고 문", new Vector3(-2f, 0f, 4.5f), 1.9f, "황동 열쇠",
             "굳게 잠겨 있다. 열쇠가 필요하다.", "철컥 — 창고 문이 열렸다.", timber);
+        // 열쇠로 조용히 열거나, 오빠가 힘으로 억지로 열거나 (큰 소리, 죄책감 +2)
+        BuildForcedEntry(storageDoor, new Vector3(-2f, 0f, 4.5f), 1.9f, brotherName);
         InteractableDoor pantryDoor = BuildDoor("다용도실 문", new Vector3(-5f, 0f, -1.1f), 1.7f, "공구 상자",
             "문틀이 뒤틀려 꿈쩍도 하지 않는다. 공구가 필요하다.", "공구로 문틀을 비틀어 열었다.", timber);
 
@@ -435,6 +437,24 @@ public static class PrototypeSceneBuilder
         return door;
     }
 
+    // 잠긴 문 강제로 열기 (힘 = 오빠). 문 트리거(태그 Door)와 따로 둔 트리거라 PlayerInteraction이 문보다 먼저 처리함
+    static ForcedEntry BuildForcedEntry(InteractableDoor door, Vector3 hinge, float width, string brotherName)
+    {
+        var go = new GameObject("강제로 열기 (" + door.name + ")");
+        go.transform.position = hinge;
+        var reach = go.AddComponent<BoxCollider>();
+        reach.isTrigger = true;
+        reach.center = new Vector3(0f, 1.2f, width * 0.5f);
+        reach.size = new Vector3(2.6f, 2.4f, width + 0.6f);
+        var forced = go.AddComponent<ForcedEntry>();
+        forced.door = door;
+        forced.displayName = "문";
+        forced.requiredTrait = CharacterTrait.Strength;
+        forced.failMessage = $"혼자서는 열 수 없다... {brotherName}라면 억지로 열 수 있을지도.";
+        forced.noiseRadius = 6f;
+        return forced;
+    }
+
     static InteractableItem BuildItem(string itemName, Vector3 floorPosition, Vector3 size, CharacterTrait requiredTrait, string failMessage, Material material)
     {
         var root = new GameObject("Item_" + itemName);
@@ -467,6 +487,11 @@ public static class PrototypeSceneBuilder
         var dummy = npc.AddComponent<DummyNpc>();
         dummy.DisplayName = "가정부";
         dummy.Line = "정전이 나서 일을 할 수가 없네요. 주인어른 서재 책상에 창고 열쇠가 있을 텐데…";
+        // 여동생 화술: 발더스 게이트 3처럼 [화술]이 붙은 추가 대사 (임시 문구)
+        var persuasion = npc.AddComponent<TraitInsight>();
+        persuasion.requiredTrait = CharacterTrait.Persuasion;
+        persuasion.label = "화술";
+        persuasion.extraText = "…아가씨한테만 말하는 건데요, 어젯밤 늦게 주인어른이 서재에서 누군가와 크게 다투셨어요.";
         var body = npc.AddComponent<CapsuleCollider>();
         body.height = 2f;
         body.radius = 0.35f;

@@ -278,5 +278,40 @@ public static class PrototypeSceneValidator
             giver.GetComponent<Inventory>().RemoveItem("점검용 쪽지");
             inventory.items.RemoveRange(heldBefore, inventory.items.Count - heldBefore);
         }
+
+        // 화술: 여동생에게만 가정부의 [화술] 대사가 붙음 (지금 조작 = 여동생)
+        var maid = Object.FindAnyObjectByType<DummyNpc>();
+        Check(maid.GetComponent<TraitInsight>() != null && maid.Line.Contains("[화술]"), "여동생이 말을 걸면 가정부 대사에 [화술] 문장이 붙음");
+        MethodInfo switchPlayer = typeof(CharacterManager).GetMethod("SwitchPlayer", BindingFlags.NonPublic | BindingFlags.Instance);
+        switchPlayer.Invoke(manager, new object[] { 1 });
+        yield return 0.2f;
+        Check(!maid.Line.Contains("[화술]"), "오빠에게는 원래 대사만");
+
+        // 강제로 열기: 열쇠 없이 잠긴 창고 문 → 오빠만, 큰 소리, 죄책감 +2 (지금 조작 = 오빠)
+        var forced = Object.FindAnyObjectByType<ForcedEntry>();
+        Inventory brotherBag = brother.GetComponent<Inventory>();
+        storageDoor.Interact(brotherBag); // 닫기
+        yield return 1f;
+        storageDoor.ToggleLock(brotherBag); // 열쇠로 다시 잠금
+        yield return 0.2f;
+        Check(forced != null && forced.door == storageDoor && storageDoor.IsLocked && !forced.Available, "열쇠가 있으면 강제로 열기 안내가 없음 (조용히 열면 됨)");
+        brotherBag.RemoveItem("황동 열쇠");
+        Check(forced.Available, "열쇠 없이 잠긴 창고 문 앞 → 강제로 열기 가능");
+        forced.Use(sister.GetComponent<PlayerInteraction>());
+        yield return 0.2f;
+        Check(!forced.Busy && storageDoor.IsLocked, "여동생은 강제로 열 수 없음 (힘 특성 없음)");
+        int guiltBefore = GuiltSystem.Value;
+        NoiseEvent? loudest = null;
+        void OnNoise(NoiseEvent e) { if (e.kind == NoiseKind.DoorBash) loudest = e; }
+        NoiseSystem.Emitted += OnNoise;
+        forced.Use(brother.GetComponent<PlayerInteraction>());
+        yield return 0.2f;
+        Check(forced.Busy && brother.GetComponent<PlayerMovement>().Locks.Has(LockReason.Working), "오빠가 문을 여는 동안 이동 잠김");
+        yield return forced.forceTime + 1f;
+        NoiseSystem.Emitted -= OnNoise;
+        Check(storageDoor.IsOpen && !storageDoor.IsLocked && loudest.HasValue && loudest.Value.radius >= storageDoor.bashNoise,
+            "오빠가 창고 문을 억지로 엶 (큰 소리)");
+        Check(GuiltSystem.Value == guiltBefore + 2, $"강제로 열기 → 죄책감 +2 ({guiltBefore} → {GuiltSystem.Value})");
+        brotherBag.AddItem("황동 열쇠");
     }
 }

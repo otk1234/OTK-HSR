@@ -478,6 +478,8 @@ public static class ChaseTestSceneBuilder
         spot.exitTime = exit;
         spot.noiseRadius = noise;
         spot.exposedWithin = exposed;
+        // 침대 밑·식탁 밑처럼 낮은 곳은 여동생만 (오빠 184cm, 사용자 결정 2026-10-23)
+        if (kind == HidingKind.UnderBed) spot.onlyFor = CharacterType.Player1;
     }
 
     // ---------------- 캐릭터 ----------------

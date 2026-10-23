@@ -27,17 +27,19 @@ public class CharacterRoster : ScriptableObject
         }
     }
 
-    // 기본 프로필 (사용자 확정 2026-10-22, 이름·나이는 임시): 0번 여동생 = 정보 수집, 1번 오빠 = 힘·기계 조작
+    // 기본 프로필 (사용자 확정 2026-10-22·23, 이름·나이·수치는 임시)
+    //  0번 여동생 = 관찰·통찰·화술, 가벼운 몸(발소리 ×0.75), 스태미나 ×0.85
+    //  1번 오빠 = 힘·기계 조작, 발소리 기본, 체력(스태미나 ×1.25)
     public static CharacterProfile[] CreateDefaults()
     {
         return new[]
         {
-            Make(CharacterType.Player1, "여동생", 21, 5, CharacterTrait.Investigation),
-            Make(CharacterType.Player2, "오빠", 23, 6, CharacterTrait.Strength | CharacterTrait.Mechanics),
+            Make(CharacterType.Player1, "여동생", 21, 5, CharacterTrait.Investigation | CharacterTrait.Insight | CharacterTrait.Persuasion, 0.75f, 0.85f),
+            Make(CharacterType.Player2, "오빠", 23, 6, CharacterTrait.Strength | CharacterTrait.Mechanics, 1f, 1.25f),
         };
     }
 
-    static CharacterProfile Make(CharacterType type, string name, int age, int capacity, CharacterTrait traits)
+    static CharacterProfile Make(CharacterType type, string name, int age, int capacity, CharacterTrait traits, float footstep, float stamina)
     {
         var profile = CreateInstance<CharacterProfile>();
         profile.name = name;
@@ -46,6 +48,8 @@ public class CharacterRoster : ScriptableObject
         profile.age = age;
         profile.inventoryCapacity = capacity;
         profile.traits = traits;
+        profile.footstepMultiplier = footstep;
+        profile.staminaMultiplier = stamina;
         return profile;
     }
 
@@ -78,6 +82,18 @@ public class CharacterRoster : ScriptableObject
     {
         CharacterProfile profile = For(type);
         return profile != null ? profile.inventoryCapacity : int.MaxValue;
+    }
+
+    public static float FootstepMultiplierOf(GameObject player)
+    {
+        CharacterProfile profile = For(TypeOf(player));
+        return profile != null ? profile.footstepMultiplier : 1f;
+    }
+
+    public static float StaminaMultiplierOf(GameObject player)
+    {
+        CharacterProfile profile = For(TypeOf(player));
+        return profile != null ? profile.staminaMultiplier : 1f;
     }
 
     public static bool Has(CharacterType type, CharacterTrait trait)

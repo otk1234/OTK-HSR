@@ -68,7 +68,19 @@ public static class CrimeSceneTestSceneValidator
         if (board == null || board.deduction == null || board.timer == null) problems.Add("추리 창(DeductionBoard) 연결 안 됨");
         else
         {
-            var clueIds = new HashSet<string>(clues.Select(c => c.clueId));
+            // 근거 = 단서(Clue) + 여동생 통찰로만 얻는 근거(TraitInsight)
+            var insights = Object.FindObjectsByType<TraitInsight>(FindObjectsInactive.Include).Where(t => !string.IsNullOrEmpty(t.evidenceId)).ToArray();
+            if (insights.Select(t => t.evidenceId).Distinct().Count() != 2 || insights.Any(t => t.requiredTrait != CharacterTrait.Insight || t.GetComponent<InspectionItem>() == null))
+                problems.Add("통찰 근거(아는 사이·걸음걸이) 2종이 조사 항목에 통찰 조건으로 붙어 있지 않음");
+            var clueIds = new HashSet<string>(clues.Select(c => c.clueId).Concat(insights.Select(t => t.evidenceId)));
+            // 여동생 능력으로만 얻는 근거: 관찰(숨은 단서) + 통찰
+            var sisterOnly = new HashSet<string>(clues.Where(c => !c.IsVisibleTo(CharacterType.Player2)).Select(c => c.clueId).Concat(insights.Select(t => t.evidenceId)));
+            foreach (string qid in new[] { "relation", "culprit" })
+            {
+                CaseDeduction.Question q = board.deduction.Find(qid);
+                if (q != null && q.options.Where(o => o.correct).Any(o => o.needAnyClue.Any(id => !sisterOnly.Contains(id))))
+                    problems.Add($"추리 '{qid}': 정답이 여동생 능력 없이도 열림 (공통 근거만으로 정답 불가여야 함)");
+            }
             foreach (CaseDeduction.Question q in board.deduction.questions)
             {
                 if (!q.options.Any(o => o.correct)) problems.Add($"추리 '{q.id}': 정답 없음");
@@ -275,10 +287,25 @@ public static class CrimeSceneTestSceneValidator
         Check(recorder.Repaired && video.gameObject.activeSelf && recorder.indicator.sharedMaterial == recorder.repairedMaterial,
             "오빠가 녹화기를 고침 → 표시등 초록, 녹화 영상 조사 지점이 나타남");
         Check(!brotherHands.HasTarget || !recorder.Available, "고친 뒤엔 다시 고치기 안내가 없음");
+        InspectionItem videoItem = ItemOf(video, "intercom_video");
         foreach (float s in Inspect(brother, video, "intercom_video")) yield return s;
         Check(CaseFile.Has("intercom_video") && CaseFile.Entries.Count == 4, $"녹화 영상 기록 (단서 {CaseFile.Entries.Count}개)");
+        Check(!CaseFile.Has(CrimeSceneTestSceneBuilder.GaitEvidence) && !videoItem.Description.Contains("[통찰]"),
+            "오빠가 영상을 보면 사실만 보이고 통찰 근거(걸음걸이)는 없음");
 
-        // ---- 추리 (지금 단서: 시체·섬유·수첩·녹화 영상, 찻잔·상처는 없음 / 조작 중 = 오빠) ----
+        // ---- 여동생 통찰: 오빠가 고친 녹화기의 영상을 여동생이 보면 추가 근거 ----
+        manager.SwitchInstant(0);
+        Place(sister, new Vector3(6.9f, 0f, 3.5f));
+        yield return 0.3f;
+        Check(videoItem.Description.Contains("[통찰]"), "여동생이 조작하면 영상 설명에 [통찰] 문장이 붙음");
+        foreach (float s in Inspect(sister, video, "intercom_video")) yield return s;
+        Check(CaseFile.Has(CrimeSceneTestSceneBuilder.GaitEvidence) && CaseFile.Entries.Last().foundBy == CharacterType.Player1 && CaseFile.Entries.Count == 5,
+            "여동생이 영상을 보면 통찰 근거 '아빠의 걸음걸이' 기록 (오빠가 고치고 → 여동생이 봄)");
+        Check(!CaseFile.Has(CrimeSceneTestSceneBuilder.AcquaintanceEvidence), "찻잔·상처를 여동생이 안 봤으면 '아는 사이' 근거 없음");
+        manager.SwitchInstant(1);
+        yield return 0.2f;
+
+        // ---- 추리 (지금 근거: 시체·섬유·수첩·녹화 영상·걸음걸이, 찻잔·상처·아는 사이는 없음 / 조작 중 = 오빠) ----
         var board = Object.FindAnyObjectByType<DeductionBoard>();
         CaseDeduction data = board.deduction;
         board.Open();
@@ -286,7 +313,7 @@ public static class CrimeSceneTestSceneValidator
         Check(board.IsOpen && brother.GetComponent<PlayerMovement>().Locks.Has(LockReason.Deduction) && manager.SwitchLocks.Has(LockReason.Deduction)
               && !brother.GetComponent<PlayerInteractor3D>().enabled, "추리 창이 열리면 이동·전환·조사 잠김");
         Check(board.CurrentQuestion.id == "relation" && !board.Choose(1) && !CaseState.HasAnswered(data.caseId, "relation"),
-            "근거 단서(찻잔·상처)가 없으면 '아는 사이' 선택지를 고를 수 없음");
+            "여동생 통찰 근거(아는 사이)가 없으면 '아는 사이' 선택지를 고를 수 없음");
         Check(!board.Choose(0) && !board.Choose(2) && !CaseState.HasAnswered(data.caseId, "relation"),
             "오답 선택지도 근거(핏자국·재떨이)가 없으면 잠김 → 잠김 표시가 정답 힌트가 아님");
         Check(board.VisibleOptions(data.Find("relation"))[3].text == CaseDeduction.UnknownOptionText

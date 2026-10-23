@@ -250,6 +250,12 @@ public static class CrimeSceneDemo
         yield return recorder.repairTime + 1.5f;
         foreach (float s in Inspect(brother, Area("인터폰 녹화 영상"), read + 1.5f, "intercom_video")) yield return s;
 
+        Say("④ 오빠에게는 영상의 <b>사실</b>만 보입니다. 여동생이 보면 <b>[통찰]</b> 문장이 붙고\n'아빠의 걸음걸이'가 <b>여동생만 얻는 추리 근거</b>로 기록됩니다. (오빠가 고치고 → 여동생이 봄)");
+        manager.SwitchInstant(0);
+        sister.GetComponent<NavMeshAgent>().Warp(new Vector3(6.9f, 0f, 3.5f));
+        yield return 1.5f;
+        foreach (float s in Inspect(sister, Area("인터폰 녹화 영상"), read + 2f, "intercom_video")) yield return s;
+
         // ---- 4. 제한 시간 ----
         // ---- 5. 제한 시간 → 추리 창 자동 ----
         manager.SwitchInstant(0);

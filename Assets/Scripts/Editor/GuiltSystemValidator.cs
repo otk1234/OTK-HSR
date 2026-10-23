@@ -61,7 +61,7 @@ public static class GuiltSystemValidator
         GuiltActionTable asset = EnsureTableAsset();
         GuiltSystem.Table = null;
         Check(GuiltSystem.Table == asset, "Resources에서 행동 표를 불러옴");
-        Check(asset.tiers.Length == 7 && asset.actions.Length == 13, $"행동 표: 단계 {asset.tiers.Length}개, 행동 {asset.actions.Length}개");
+        Check(asset.tiers.Length == 7 && asset.actions.Length == 14, $"행동 표: 단계 {asset.tiers.Length}개, 행동 {asset.actions.Length}개");
         Check(asset.Find("abet_crime")?.amount == 8 && asset.Find("incite_crime")?.amount == 5 && asset.Find("prevent_crime")?.amount == -5,
             "개입 죄책감: 가담 +8, 종용 +5, 막기 −5");
 

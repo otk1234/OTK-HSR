@@ -119,6 +119,15 @@ public class InteractableDoor : MonoBehaviour
         StateChanged?.Invoke(this);
     }
 
+    // 플레이어가 강제로 열기 (ForcedEntry: 오빠의 힘). 잠금이 풀리고 열림, 부수기만큼 큰 소리
+    public void ForceOpen(GameObject who)
+    {
+        if (isOpen || isBroken || isMoving) return;
+        isLocked = false;
+        NoiseSystem.Emit(transform.position, bashNoise, NoiseKind.DoorBash, who);
+        StartCoroutine(MoveDoorRoutine(true, who));
+    }
+
     // ---------------- 추격자용 ----------------
 
     // 잠기지 않은 닫힌 문을 엽니다. noiseScale: 조용히 열면 1보다 작게.

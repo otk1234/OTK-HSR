@@ -21,6 +21,7 @@ public class PlayerStamina : MonoBehaviour
 
     void Awake()
     {
+        max *= CharacterRoster.StaminaMultiplierOf(gameObject); // 체력 차이 (프로필: 여동생 ×0.85, 오빠 ×1.25)
         Current = max;
     }
 

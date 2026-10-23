@@ -25,8 +25,7 @@ MonoBehaviour:
     - text: "\uC544\uB294 \uC0AC\uC774. \uCC28\uB97C \uB300\uC811\uD588\uACE0, \uB4F1\uC744 \uBCF4\uC77C \uB9CC\uD07C \uBBFF\uC5C8\uB2E4."
       correct: 1
       needAnyClue:
-      - two_cups
-      - head_wound
+      - insight_acquaintance
     - text: "\uC0AC\uACE0\uC600\uB2E4. \uB118\uC5B4\uC9C0\uBA70 \uC7AC\uB5A8\uC774\uC5D0 \uBD80\uB52A\uCCE4\uB2E4."
       correct: 0
       needAnyClue:
@@ -49,7 +48,7 @@ MonoBehaviour:
     - text: "\uC544\uBE60\uB2E4. \uB179\uD654 \uC601\uC0C1 \uC18D \uAC78\uC74C\uAC78\uC774\uAC00 \uC544\uBE60\uB2E4."
       correct: 1
       needAnyClue:
-      - intercom_video
+      - insight_gait
     - text: "\uD53C\uD574\uC790\uC758 \uB2E4\uB978 \uC9C0\uC778."
       correct: 0
       needAnyClue:

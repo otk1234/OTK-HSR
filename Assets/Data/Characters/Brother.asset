@@ -17,3 +17,5 @@ MonoBehaviour:
   age: 23
   inventoryCapacity: 6
   traits: 6
+  footstepMultiplier: 1
+  staminaMultiplier: 1.25
