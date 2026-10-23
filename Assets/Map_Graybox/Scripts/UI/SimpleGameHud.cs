@@ -20,6 +20,7 @@ namespace NarrativeGraybox.UI
         private readonly bool[] equipped = new bool[5];
         public bool FlashlightEquipped => leftHand == "손전등" || rightHand == "손전등";
         public bool Selecting => selecting;
+        public int SelectedSlot => selectedSlot; // [OTK 통합] 건네주기(G)가 선택 칸을 읽음
         private void Update()
         {
             if (Input.GetKeyDown(KeyCode.Q)) selecting = false;

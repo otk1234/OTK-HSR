@@ -48,6 +48,7 @@ public class PrototypeIntegration : MonoBehaviour
     private bool wasInspecting;
     private bool restoringCamera;
     private bool completeShown;
+    private bool wasSelecting;
     private GUIStyle labelStyle;
     private GUIStyle centeredStyle;
     private bool overviewFollowEnabled;
@@ -111,6 +112,7 @@ public class PrototypeIntegration : MonoBehaviour
         }
 
         SyncHud(active);
+        HandleHandover(active);
         KeepRoomCameraInSync(active);
 
         if (!completeShown && objectives.Length > 0 && CurrentObjective() == null)
@@ -221,6 +223,31 @@ public class PrototypeIntegration : MonoBehaviour
         if (here != null) hud.SetLocation(here.roomName);
     }
 
+    // 소지품 선택(R) 중 G: 고른 칸의 아이템을 다른 캐릭터에게 건넴 (조건은 ItemHandover)
+    void HandleHandover(GameObject active)
+    {
+        if (!hud.Selecting)
+        {
+            if (wasSelecting) hud.SetInteractionPrompt("");
+            wasSelecting = false;
+            return;
+        }
+        wasSelecting = true;
+
+        GameObject other = OtherPlayer(active);
+        List<string> items = active.GetComponent<Inventory>().items;
+        string item = other != null && hud.SelectedSlot < items.Count ? items[hud.SelectedSlot] : null;
+        hud.SetInteractionPrompt(item != null ? $"[G] {CharacterRoster.NameOf(other)}에게 {item} 건네기" : "");
+        if (item != null && Input.GetKeyDown(KeyCode.G)) ItemHandover.Give(active, other, item);
+    }
+
+    GameObject OtherPlayer(GameObject active)
+    {
+        foreach (GameObject player in Players)
+            if (player != active) return player;
+        return null;
+    }
+
     static float Volume(CameraTrigger room)
     {
         Vector3 size = room.GetComponent<Collider>().bounds.size;
@@ -329,8 +356,8 @@ public class PrototypeIntegration : MonoBehaviour
 
         float width = Screen.width / scale;
         GUI.color = new Color(1f, 1f, 1f, 0.8f);
-        GUI.Label(new Rect(width * 0.5f - 320, 30, 640, 24),
-            "WASD 이동    Shift 달리기    E 상호작용 · 조사    F 문 잠금    Tab 캐릭터 전환    R 소지품", centeredStyle);
+        GUI.Label(new Rect(width * 0.5f - 370, 30, 740, 24),
+            "WASD 이동    Shift 달리기    E 상호작용 · 조사    F 문 잠금    Tab 캐릭터 전환    R 소지품 (G 건네기)", centeredStyle);
 
         GUI.matrix = previousMatrix;
         GUI.color = previousColor;

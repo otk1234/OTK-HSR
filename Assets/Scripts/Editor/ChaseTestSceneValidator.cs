@@ -295,10 +295,15 @@ public static class ChaseTestSceneValidator
         yield return 0.3f;
         var single = ChaseTargeting.FromSighting(p1);
         Check(single.Count == 1 && single[0] == p1, "다른 방이면 발견된 한 명만");
+        var p1Items = p1.GetComponent<Inventory>();
+        p1Items.AddItem("점검용 쪽지");
+        Check(ItemHandover.Check(p1.gameObject, p2.gameObject, "점검용 쪽지") == HandoverResult.Ok, "건네주기: 다른 방이어도 같은 건물(집)이면 됨");
         Place(p2, new Vector3(-12f, 0f, 0f));              // 마당 (다른 건물)
         yield return 0.3f;
         var byEvent = ChaseTargeting.ForChaser(new Vector3(1.5f, 1f, -1.5f));
         Check(byEvent.Count == 1 && byEvent[0] == p1 && p2.CurrentRoom.buildingId == "Outside", "이벤트 추격: 추격자와 같은 건물(집)에 있는 한 명만");
+        Check(ItemHandover.Check(p1.gameObject, p2.gameObject, "점검용 쪽지") == HandoverResult.NotSamePlace, "건네주기: 집 안 ↔ 마당은 안 됨");
+        p1Items.RemoveItem("점검용 쪽지");
 
         // ---- 추격 상태: 즉시 컷 ----
         Place(p2, new Vector3(-5f, 0f, 1.8f));

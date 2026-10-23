@@ -25,7 +25,8 @@ public class InteractableItem : MonoBehaviour
 
     public void PickUp(Inventory playerInventory)
     {
-        playerInventory.AddItem(itemName);
+        // 다룰 수 있는 조건도 같이 기억 (건네줄 때 받는 쪽도 만족해야 함)
+        playerInventory.AddItem(itemName, new Inventory.ItemRule { requiredCharacter = requiredCharacter, requiredTrait = requiredTrait });
         GameMessage.Show(string.IsNullOrEmpty(pickupMessage) ? $"{itemName}을(를) 획득했다." : pickupMessage, hintImage);
         Destroy(gameObject);
     }

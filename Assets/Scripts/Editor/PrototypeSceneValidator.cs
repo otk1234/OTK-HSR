@@ -198,6 +198,28 @@ public static class PrototypeSceneValidator
         storageDoor.Interact(sister.GetComponent<Inventory>());
         yield return 1f;
         Check(storageDoor.IsOpen, "열쇠 가진 여동생은 창고 문을 엶");
+        Check(sister.GetComponent<Inventory>().HasItem("황동 열쇠"), "문을 열어도 열쇠는 소지품에 남음 (아이템은 써도 사라지지 않음)");
+
+        // 건네주기: 같은 건물이면 됨 → 열쇠가 오빠에게 넘어감
+        Check(ItemHandover.Give(sister, brother, "황동 열쇠") == HandoverResult.Ok
+              && brother.GetComponent<Inventory>().HasItem("황동 열쇠") && !sister.GetComponent<Inventory>().HasItem("황동 열쇠"),
+            "건네주기: 같은 건물(집)이면 열쇠를 오빠에게 건넴");
+        storageDoor.Interact(brother.GetComponent<Inventory>()); // 닫기
+        yield return 1f;
+        storageDoor.Interact(brother.GetComponent<Inventory>()); // 건네받은 열쇠로 다시 열기 (한 번 연 문은 잠금이 풀려 있음)
+        yield return 1f;
+        Check(storageDoor.IsOpen && brother.GetComponent<Inventory>().HasItem("황동 열쇠"), "건네받은 쪽도 문을 쓸 수 있고, 열쇠는 그대로 남음");
+
+        // 건네주기: 어느 구역에도 없으면 안 됨
+        var sisterAgent = sister.GetComponent<NavMeshAgent>();
+        Vector3 sisterAt = sister.transform.position;
+        sisterAgent.enabled = false;
+        sister.transform.position = new Vector3(500f, 0f, 500f);
+        Check(ItemHandover.Check(brother, sister, "황동 열쇠") == HandoverResult.NotSamePlace, "건네주기: 구역 밖(다른 장소)이면 안 됨");
+        sister.transform.position = sisterAt;
+        sisterAgent.enabled = true;
+        sisterAgent.Warp(sisterAt);
+        yield return 0.2f;
 
         // 캐릭터 전환
         typeof(CharacterManager).GetMethod("SwitchPlayer", BindingFlags.NonPublic | BindingFlags.Instance).Invoke(manager, new object[] { 1 });
@@ -215,6 +237,9 @@ public static class PrototypeSceneValidator
             "공구 상자는 힘 특성(오빠)만 들 수 있음");
         box.PickUp(brother.GetComponent<Inventory>());
         yield return 0.2f;
+        Check(ItemHandover.Give(brother, sister, "공구 상자") == HandoverResult.ReceiverCannotHandle
+              && brother.GetComponent<Inventory>().HasItem("공구 상자") && !sister.GetComponent<Inventory>().HasItem("공구 상자"),
+            "건네주기: 힘 특성이 없는 여동생에게 공구 상자는 못 건넴");
 
         // 다용도실 문 (공구 필요)
         var pantryPath = new NavMeshPath();
@@ -246,6 +271,11 @@ public static class PrototypeSceneValidator
             Check(!integration.hud.TryAddItem("점검용 추가 물건") && integration.hud.InventoryFullMessage == expected
                   && inventory.items.Count == inventory.Capacity,
                 $"{integration.NameFor(index)}: 가득 차면 조사로 얻기 거절, 문구 '{integration.hud.InventoryFullMessage}'");
+            GameObject giver = manager.players[1 - index];
+            giver.GetComponent<Inventory>().AddItem("점검용 쪽지");
+            Check(ItemHandover.Check(giver, manager.players[index], "점검용 쪽지") == HandoverResult.ReceiverFull,
+                $"건네주기: {integration.NameFor(index)}의 소지품이 가득 차면 못 건넴");
+            giver.GetComponent<Inventory>().RemoveItem("점검용 쪽지");
             inventory.items.RemoveRange(heldBefore, inventory.items.Count - heldBefore);
         }
     }
