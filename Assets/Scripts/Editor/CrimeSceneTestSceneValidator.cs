@@ -291,12 +291,15 @@ public static class CrimeSceneTestSceneValidator
         Check(!CaseState.Record(data.caseId, relation, relation.options[2], CharacterType.Player2) && board.CurrentQuestion.id == "culprit",
             "한 번 답한 질문은 바꿀 수 없음 → 다음 질문");
         CaseDeduction.Question culprit = data.Find("culprit");
-        List<CaseDeduction.Option> sisterView = board.VisibleOptions(culprit, CharacterType.Player1), brotherView = board.VisibleOptions(culprit, CharacterType.Player2);
-        Check(sisterView.Count == 4 && brotherView.Count == 3 && sisterView[1].onlyForTrait == CharacterTrait.Investigation && sisterView[1].Unlocked,
-            "여동생에게만 '섬유' 근거 선택지가 보임 (오빠는 녹화 영상 근거만)");
+        List<CaseDeduction.Option> options = board.VisibleOptions(culprit);
+        Check(options.Count == 4 && options[1].needAnyClue.Contains("navy_fiber") && options[1].Unlocked && options[2].Unlocked,
+            "선택지는 누가 추리하든 같음: 섬유·녹화 영상 근거 선택지 둘 다 보이고 고를 수 있음");
         Check(board.Choose(1) && CaseState.TryGet(data.caseId, "culprit", out CaseState.Answer culpritAnswer) && culpritAnswer.correct && culpritAnswer.answeredBy == CharacterType.Player2,
-            "오빠가 녹화 영상 근거로 '아빠' 정답");
+            "여동생이 찾은 섬유를 근거로 오빠가 '아빠' 정답 (답한 사람 = 오빠로 기록)");
         Check(board.Choose(0) && board.CurrentQuestion == null && CaseState.Answers.Count == 3, "수첩 근거로 다음 범행 정답 → 추리 완료");
+        string screen = board.ScreenText();
+        Check(screen.Contains("추리 완료") && screen.Contains(relation.options[0].text) && !screen.Contains("정답") && !screen.Contains("오답"),
+            "추리 창에는 고른 답만 보이고 정답·오답은 보이지 않음");
         board.Close();
         yield return 0.2f;
         Check(!board.IsOpen && !brother.GetComponent<PlayerMovement>().Locks.IsLocked && !manager.SwitchLocks.IsLocked && brother.GetComponent<PlayerInteractor3D>().enabled,

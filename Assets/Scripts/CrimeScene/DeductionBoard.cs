@@ -4,7 +4,7 @@ using UnityEngine;
 
 // 추리 창 (최소 구현, 개발용 화면). J로 열고 닫음, 제한 시간이 끝나면 자동으로 열림.
 // 답하지 않은 첫 질문을 보여 주고 숫자 키로 고름. 근거 단서가 없는 선택지는 고를 수 없음.
-// 선택지는 지금 조작 중인 캐릭터 기준 (여동생·오빠가 서로 다른 근거로 같은 결론에 도달할 수 있음).
+// 선택지는 누가 추리하든 같음 (남매 공용 사건 파일 기준). 답한 사람은 기록만 함. 정답·오답은 화면에 보이지 않음.
 // 실제 추리 화면은 UI 담당에게 넘길 부분 → 여기선 데이터·규칙만 확인할 수 있으면 됨.
 public class DeductionBoard : MonoBehaviour
 {
@@ -48,12 +48,11 @@ public class DeductionBoard : MonoBehaviour
         }
     }
 
-    public List<CaseDeduction.Option> VisibleOptions(CaseDeduction.Question question, CharacterType who)
+    // 선택지는 누가 추리하든 같음 (남매 공용 사건 파일 기준으로 잠금만 다름)
+    public List<CaseDeduction.Option> VisibleOptions(CaseDeduction.Question question)
     {
         var list = new List<CaseDeduction.Option>();
-        if (question != null)
-            foreach (CaseDeduction.Option option in question.options)
-                if (option.VisibleTo(who)) list.Add(option);
+        if (question != null) list.AddRange(question.options);
         return list;
     }
 
@@ -62,7 +61,7 @@ public class DeductionBoard : MonoBehaviour
     {
         CaseDeduction.Question question = CurrentQuestion;
         CharacterType who = ActiveType();
-        List<CaseDeduction.Option> options = VisibleOptions(question, who);
+        List<CaseDeduction.Option> options = VisibleOptions(question);
         if (question == null || index < 0 || index >= options.Count || !options[index].Unlocked) return false;
         return CaseState.Record(deduction.caseId, question, options[index], who);
     }
@@ -129,30 +128,36 @@ public class DeductionBoard : MonoBehaviour
             style.normal.textColor = Color.white;
         }
 
+        var box = new Rect(Screen.width * 0.5f - 380, Screen.height * 0.5f - 170, 760, 300);
+        GUI.color = new Color(0.03f, 0.03f, 0.05f, 0.94f);
+        GUI.DrawTexture(box, Texture2D.whiteTexture);
+        GUI.color = Color.white;
+        GUI.Label(new Rect(box.x + 18, box.y + 12, box.width - 36, box.height - 24), ScreenText(), style);
+    }
+
+    // 추리 창에 보이는 글자 (점검에서도 읽음)
+    public string ScreenText()
+    {
         var text = new StringBuilder();
-        text.AppendLine($"<b>[개발용 추리 창] {deduction.caseTitle}</b>   <color=#aaaaaa>({ActiveType()} 기준)</color>");
+        text.AppendLine($"<b>[개발용 추리 창] {deduction.caseTitle}</b>");
         text.AppendLine();
         CaseDeduction.Question question = CurrentQuestion;
         if (question != null)
         {
             text.AppendLine($"<b>{question.text}</b>   <color=#aaaaaa>(한 번 답하면 바꿀 수 없음)</color>");
-            List<CaseDeduction.Option> options = VisibleOptions(question, ActiveType());
+            List<CaseDeduction.Option> options = VisibleOptions(question);
             for (int i = 0; i < options.Count; i++)
                 text.AppendLine(options[i].Unlocked ? $"  [{i + 1}] {options[i].text}" : $"  <color=#777777>[{i + 1}] ??? (근거 단서 부족)</color>");
         }
         else
         {
+            // 정답·오답은 보여 주지 않음 (스토리 몰입, 사용자 결정 2026-10-23) — 고른 답만. 결과는 CaseState·콘솔 로그에
             text.AppendLine("<b>추리 완료</b>");
             foreach (CaseState.Answer a in CaseState.Answers)
-                if (a.caseId == deduction.caseId) text.AppendLine($"  {(a.correct ? "<color=#88ee88>정답</color>" : "<color=#ff7777>오답</color>")}  {a.text}");
+                if (a.caseId == deduction.caseId) text.AppendLine($"  · {a.text}");
         }
         text.AppendLine();
         text.AppendLine("<color=#bbbbbb>숫자 키 선택   J / Q 닫기</color>");
-
-        var box = new Rect(Screen.width * 0.5f - 380, Screen.height * 0.5f - 170, 760, 300);
-        GUI.color = new Color(0.03f, 0.03f, 0.05f, 0.94f);
-        GUI.DrawTexture(box, Texture2D.whiteTexture);
-        GUI.color = Color.white;
-        GUI.Label(new Rect(box.x + 18, box.y + 12, box.width - 36, box.height - 24), text.ToString(), style);
+        return text.ToString();
     }
 }

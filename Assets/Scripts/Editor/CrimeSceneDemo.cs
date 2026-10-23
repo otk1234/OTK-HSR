@@ -262,7 +262,7 @@ public static class CrimeSceneDemo
         board.Choose(0);
         yield return 4f;
 
-        Say("⑥ 여동생은 <b>손톱 밑 섬유</b>를 근거로 '아빠'를 고를 수 있습니다.\n(오빠에게는 이 선택지가 없고, 녹화 영상 근거만 보임)");
+        Say("⑥ 여동생이 찾은 <b>손톱 밑 섬유</b>를 근거로 '아빠'를 고릅니다.\n(누가 찾았든 사건 파일에 근거가 있으면 남매 누구나 고를 수 있음 — 여동생이 오빠에게 알려 주면 되니까)");
         yield return 5f;
         board.Choose(1);
         yield return 3f;
@@ -271,7 +271,7 @@ public static class CrimeSceneDemo
         yield return 3.5f;
         board.Choose(0);
         yield return 1f;
-        Say("⑥ 추리 결과 (정답·오답)는 다음 사건으로 넘겨집니다. 다음 단계 = 개입 (종용 · 가담 · 막기)");
+        Say("⑥ 플레이어 화면에는 <b>정답·오답이 보이지 않습니다</b> (고른 답만). 결과는 기록에 남아 다음 사건으로 넘겨집니다.\n다음 단계 = 개입 (종용 · 가담 · 막기)");
         yield return 4.5f;
         board.Close();
 
