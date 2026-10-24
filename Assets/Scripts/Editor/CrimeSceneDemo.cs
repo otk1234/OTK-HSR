@@ -286,7 +286,7 @@ public static class CrimeSceneDemo
         Say("⑦ 추리를 마치면 남매가 <b>이번 사건의 방향</b>을 정합니다 (개발용 대화 화면).\n정한 방향의 개입만 할 수 있고, 사건마다 한 번.");
         for (int i = 0; i < 40 && !planner.IsOpen; i++) yield return 0.1f;
         yield return 5f;
-        Say("⑦ 이번엔 <b>가담</b>: 시체를 욕실로 옮겨 숨깁니다.\n(종용 = 휴대전화 문자 조작, 막기 = 식탁 위 편지지로 경고 편지 → 지금은 잠김)");
+        Say("⑦ 이번엔 <b>가담</b>: 시체를 욕실로 옮겨 숨깁니다.\n(종용 = 책장 뒤 수첩을 바꿔치기해 아빠의 다음 표적을 '옆집 사람'으로, 막기 = 식탁 위 편지지로 박 선생에게 경고 → 지금은 잠김)");
         planner.Choose(InterventionKind.Abet);
         yield return 4.5f;
 

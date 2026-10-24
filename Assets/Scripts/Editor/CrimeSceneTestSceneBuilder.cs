@@ -335,11 +335,14 @@ public static class CrimeSceneTestSceneBuilder
         recorder.revealWhenRepaired = new[] { video.gameObject };
 
         // ---- 개입 지점 (남매가 정한 방향의 것만 쓸 수 있음, 사건마다 한 번) ----
-        // 종용: 침실 협탁의 피해자 휴대전화 (정보 조작 → 여동생이 빠름)
-        Visual(root, "피해자 휴대전화", new Vector3(-4.6f, 0.57f, 5.55f), new Vector3(0.1f, 0.02f, 0.18f), machineMat);
-        BuildIntervention(root, "피해자 휴대전화", new Vector3(-4.6f, 0f, 4.9f), new Vector3(1.6f, 2f, 1.4f), InterventionKind.Incite, "문자 조작하기",
-            "피해자 휴대전화로 박 선생에게 '목요일 약속 장소를 인적 없는 공원으로 바꾸자'는 문자를 보냈다. 아버지가 그곳을 택하게 된다.",
-            CharacterTrait.Investigation, 2.5f, 5f, "incite_crime", "문자를 보냈다. 아빠는... 그곳으로 갈 것이다.");
+        // 종용: 책장 뒤 피해자 수첩 — 아버지의 다음 표적을 바꿈 (정보 조작 → 여동생이 빠름).
+        // 오빠가 책장을 밀어야 나타남 (밀린 책장의 트리거와 겹치지 않게 수첩 앞쪽에 둠)
+        Intervention incite = BuildIntervention(root, "피해자 수첩", new Vector3(-6.9f, 0f, 2.2f), new Vector3(1.6f, 2f, 1.2f), InterventionKind.Incite, "마지막 장 바꿔치기",
+            "피해자 수첩의 마지막 장('목요일 밤 9시, 박 선생 댁')을 찢어 내고, 아버지가 보게 될 곳에 '옆집 사람이 그날 밤 현관에서 다 봤다'는 메모를 남겼다. 아버지의 다음 표적은 옆집 사람이 된다.",
+            CharacterTrait.Investigation, 2.5f, 5f, "incite_crime", "메모를 남겼다. 아빠는... 이제 옆집 사람을 노릴 것이다.");
+        incite.nextTarget = "옆집 사람";
+        incite.gameObject.SetActive(false);
+        shelf.revealWhenMoved = shelf.revealWhenMoved.Concat(new[] { incite.gameObject }).ToArray();
 
         // 가담: 시체를 욕실로 옮겨 숨김 (힘 → 오빠가 빠름, 여동생은 오래 걸림)
         Intervention hideBody = BuildIntervention(root, "시체", new Vector3(-3.6f, 0f, -3.4f), new Vector3(2.4f, 2f, 2f), InterventionKind.Abet, "욕실로 옮겨 숨기기",

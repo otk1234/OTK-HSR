@@ -57,6 +57,7 @@ public static class CaseState
         public InterventionKind kind;
         public string text;
         public CharacterType doneBy;
+        public string nextTarget; // 종용으로 바꾼 아버지의 다음 표적 (없으면 빈칸)
     }
 
     static readonly Dictionary<string, InterventionKind> directions = new Dictionary<string, InterventionKind>();
@@ -81,12 +82,21 @@ public static class CaseState
         return false;
     }
 
-    public static bool RecordIntervention(string caseId, InterventionKind kind, string text, CharacterType by)
+    public static bool RecordIntervention(string caseId, InterventionKind kind, string text, CharacterType by, string nextTarget = null)
     {
         if (HasIntervened(caseId)) return false;
-        interventions.Add(new InterventionRecord { caseId = caseId, kind = kind, text = text, doneBy = by });
+        interventions.Add(new InterventionRecord { caseId = caseId, kind = kind, text = text, doneBy = by, nextTarget = nextTarget ?? "" });
         Debug.Log($"[개입] {Intervention.KindName(kind)}: {text} ({by}) → 다음 사건에 반영 예정");
+        if (!string.IsNullOrEmpty(nextTarget)) Debug.Log($"[다음 사건] 아버지의 표적 변경: {nextTarget}");
         return true;
+    }
+
+    // 이 사건의 종용으로 바뀐 다음 표적 (없으면 null → 원래 표적 그대로)
+    public static string NextTargetAfter(string caseId)
+    {
+        foreach (InterventionRecord r in interventions)
+            if (r.caseId == caseId && !string.IsNullOrEmpty(r.nextTarget)) return r.nextTarget;
+        return null;
     }
 
     public static void Clear()

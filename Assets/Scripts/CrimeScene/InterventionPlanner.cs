@@ -16,7 +16,7 @@ public class InterventionPlanner : MonoBehaviour
     [TextArea] public string brotherLine = "그래서, 이번 사건은 어떻게 할 거야?";
     [TextArea] public string[] sisterLines =
     {
-        "아빠가 원하는 방향으로 판을 깔아 주자. (종용)",
+        "아빠가 다음에 누굴 노릴지... 우리가 정하게 만들자. (종용)",
         "아빠를 돕자. 현장을 정리해서 흔적을 지우자. (가담)",
         "다음 범행을 막자. 박 선생에게 알려야 해. (막기)",
     };

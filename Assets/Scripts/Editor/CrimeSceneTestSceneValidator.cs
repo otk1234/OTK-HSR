@@ -91,9 +91,16 @@ public static class CrimeSceneTestSceneValidator
                         if (!clueIds.Contains(id)) problems.Add($"추리 '{q.id}': 씬에 없는 단서 {id}");
             }
         }
-        var interventions = Object.FindObjectsByType<Intervention>();
+        var interventions = Object.FindObjectsByType<Intervention>(FindObjectsInactive.Include);
         foreach (InterventionKind kind in Enum.GetValues(typeof(InterventionKind)))
             if (interventions.Count(i => i.kind == kind) != 1) problems.Add($"개입 지점 '{Intervention.KindName(kind)}'이(가) 1개가 아님");
+        // 종용 = 아버지의 다음 표적을 바꿈 (범행을 없애지 않음), 수첩은 오빠가 책장을 밀어야 나타남
+        Intervention inciteSpot = interventions.FirstOrDefault(i => i.kind == InterventionKind.Incite);
+        if (inciteSpot == null || string.IsNullOrEmpty(inciteSpot.nextTarget) || inciteSpot.gameObject.activeSelf
+            || heavy == null || !heavy.revealWhenMoved.Contains(inciteSpot.gameObject))
+            problems.Add("종용(수첩): 다음 표적이 없거나, 책장을 밀어야 나타나게 되어 있지 않음");
+        if (interventions.Any(i => i.kind != InterventionKind.Incite && !string.IsNullOrEmpty(i.nextTarget)))
+            problems.Add("가담·막기는 다음 표적을 바꾸지 않아야 함");
         var planner = Object.FindAnyObjectByType<InterventionPlanner>();
         if (planner == null || planner.board == null) problems.Add("개입 방향 대화(InterventionPlanner) 연결 안 됨");
         var machine = Object.FindAnyObjectByType<RepairableMachine>();
@@ -340,7 +347,8 @@ public static class CrimeSceneTestSceneValidator
 
         // ---- 개입: 남매 대화로 방향을 정하고, 그 종류만 한 번 ----
         var planner = Object.FindAnyObjectByType<InterventionPlanner>();
-        Intervention[] spots = Object.FindObjectsByType<Intervention>();
+        Intervention[] spots = Object.FindObjectsByType<Intervention>(FindObjectsInactive.Include);
+        Check(Spot(InterventionKind.Incite).gameObject.activeInHierarchy, "책장을 민 뒤라 종용 지점(피해자 수첩)이 나타나 있음");
         Intervention Spot(InterventionKind kind) => spots.First(i => i.kind == kind);
         Check(!planner.IsOpen && spots.All(i => !i.Available), "방향을 정하기 전에는 어떤 개입도 할 수 없음");
         yield return planner.openDelay + 0.4f;
@@ -383,5 +391,12 @@ public static class CrimeSceneTestSceneValidator
         yield return planner.openDelay + 0.4f;
         Check(!planner.IsOpen, "방향을 이미 정했으면 대화가 다시 열리지 않음");
         Check(GuiltSystem.History.Count == 1 && GuiltSystem.History[0].actionId == "abet_crime", "죄책감은 개입으로만 바뀜 (조사·추리로는 안 바뀜)");
+        Check(CaseState.NextTargetAfter(data.caseId) == null, "가담은 아버지의 다음 표적을 바꾸지 않음");
+
+        // 종용 기록: 다음 사건의 표적이 바뀜 (이 사건은 이미 가담을 했으므로 점검용 사건 ID로)
+        Intervention incite = Spot(InterventionKind.Incite);
+        Check(CaseState.RecordIntervention("점검용 사건", InterventionKind.Incite, incite.summary, CharacterType.Player1, incite.nextTarget)
+              && CaseState.NextTargetAfter("점검용 사건") == "옆집 사람",
+            "종용 → 아버지의 다음 표적이 '옆집 사람'으로 바뀌어 기록됨");
     }
 }
