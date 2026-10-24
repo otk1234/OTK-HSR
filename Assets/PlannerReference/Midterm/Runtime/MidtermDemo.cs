@@ -56,9 +56,9 @@ namespace OTK.Midterm
         private string notice = "";
         private float noticeUntil;
         public static readonly string[] Introduction = {
-            "여동생 : 이게... 이게 뭐야?", "오빠 : 죽은 거야?", "여동생 : 모르겠어...",
-            "오빠 : 경찰에 신고하자. 너 응급처치 같은 건 못해? 심폐소생술 같은 거 있잖아.",
-            "여동생 : 그걸 지금 왜 써!", "오빠 : 아무튼!", "여동생 : 일단 상태를 좀 보자."
+            "여동생 : 이게 뭐야?!", "오빠 : 죽은 거야?", "여동생 : 모르겠어...",
+            "여동생 : 경찰에 신고하자.", "오빠 : 구급차도 불러야지. 이대로 두면 죽겠어.", "오빠: 너 응급처치 같은 건 못해? 심폐소생술 같은 거...",
+            "여동생 : 그걸 지금 왜 써!", "오빠 : 그냥 뭐라도 해보란 소리지...", "여동생 : 일단 상태를 좀 보자."
         };
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ResetSession() { states = null; active = 0; introductionSeen = false; arrival = null; collectedItems = null; }
