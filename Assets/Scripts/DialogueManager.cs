@@ -30,7 +30,54 @@ public class DialogueManager : MonoBehaviour
     private readonly Queue<Line> queue = new Queue<Line>();
     private Coroutine playing;
 
-    public bool IsShowing => playing != null;
+    public bool IsShowing => playing != null || InConversation;
+
+    // ---------------- 대화 (한 줄씩 E/Space로 넘김) ----------------
+    // 남매 대화·휴식 독백처럼 읽고 넘겨야 하는 대사. 잠금은 부르는 쪽이 함. 대화 중에 들어온 Say는 끝난 뒤에 보여 줌.
+
+    public KeyCode[] advanceKeys = { KeyCode.E, KeyCode.Space };
+    public bool InConversation { get; private set; }
+    public string CurrentSpeaker => speakerText.text;
+    public string CurrentLine => bodyText.text;
+
+    public IEnumerator Conversation(IList<(string speaker, string text)> lines)
+    {
+        if (playing != null) { StopCoroutine(playing); playing = null; }
+        InConversation = true;
+        yield return null;   // 대화를 시작한 E가 첫 줄을 넘기지 않게
+        yield return StartCoroutine(FadePanel(1f));
+        foreach ((string speaker, string text) in lines)
+        {
+            speakerText.text = speaker;
+            hintImage.gameObject.SetActive(false);
+            bodyText.text = "";
+            float shown = 0f;
+            while (shown < text.Length)
+            {
+                if (AdvancePressed()) break;   // 누르면 문장 전체를 바로 보여 줌
+                shown += charactersPerSecond * Time.unscaledDeltaTime;
+                bodyText.text = text.Substring(0, Mathf.Min(text.Length, Mathf.FloorToInt(shown)));
+                yield return null;
+            }
+            bodyText.text = text;
+            yield return null;
+            while (!AdvancePressed()) yield return null;
+        }
+        yield return StartCoroutine(FadePanel(0f));
+        InConversation = false;
+        if (queue.Count > 0) playing = StartCoroutine(PlayQueue());
+    }
+
+    // 점검·연출에서 키 대신 넘길 때
+    [System.NonSerialized] public bool scriptedAdvance;
+
+    bool AdvancePressed()
+    {
+        if (scriptedAdvance) { scriptedAdvance = false; return true; }
+        foreach (KeyCode key in advanceKeys)
+            if (Input.GetKeyDown(key)) return true;
+        return false;
+    }
 
     void Awake()
     {
@@ -45,7 +92,7 @@ public class DialogueManager : MonoBehaviour
         foreach (Line queued in queue)
             if (queued.text == text) return;
         queue.Enqueue(new Line { speaker = speaker, text = text, hint = hint });
-        if (playing == null) playing = StartCoroutine(PlayQueue());
+        if (playing == null && !InConversation) playing = StartCoroutine(PlayQueue());
     }
 
     private IEnumerator PlayQueue()

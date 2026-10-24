@@ -50,6 +50,9 @@ public static class GameSession
 
     public static bool Deployed { get; set; }   // 출발해서 임무 장소에 있음 (F6 귀환 전까지)
 
+    // 임무에서 돌아오면 휴식해야 다시 출발 (임무 → 아지트 → 휴식 → 임무 선택, 사용자 결정 2026-10-24). 게임 처음엔 바로 출발 가능
+    public static bool NeedsRest { get; set; }
+
     public static string AssignmentOf(CharacterType who) => assignments.TryGetValue(who, out string id) ? id : null;
 
     public static void Assign(CharacterType who, string missionId)
@@ -76,5 +79,6 @@ public static class GameSession
         StashChanged = null;
         assignments.Clear();
         Deployed = false;
+        NeedsRest = false;
     }
 }

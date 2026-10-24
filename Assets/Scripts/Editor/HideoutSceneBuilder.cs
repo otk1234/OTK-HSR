@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEditor;
@@ -19,7 +19,7 @@ using B = ChaseTestSceneBuilder;
 //  z=3.5 ┌────────────────────────────┐   북쪽·동쪽 = 지붕 경사 (카메라 반대편이라 보임)
 //        │      [칠판]       [작업대]   │   칠판: 아버지의 살인 추적 (사건별 단서·추리·개입·다음 표적)
 //        │                       [상자] │   상자: 남매 공용 소지품 보관 (칸 제한 없음)
-//        │  [매트리스]  [소파] [램프]     │   작업대: 장비·현황 점검 (프로필·소지품·죄책감)
+//        │  [매트리스] [지도 테이블][램프] │   작업대: 장비·현황 점검. 매트리스 = 휴식, 남매는 쉬는 자리 5곳 중 하나에
 //        │       [해치]                 │   해치: 아래층으로 (지금은 표시만, 임무 이동은 나중에)
 //  z=-3.5└────────────────────────────┘
 //       x=-5                         x=5
@@ -207,6 +207,7 @@ public static class HideoutSceneBuilder
             MissionSite[] sites = BuildMissionSites(map);
             B.BakeNavMesh("Hideout NavMesh", new Bounds(new Vector3(40f, 1f, 0f), new Vector3(100f, 6f, 16f)));
             BuildDecor(map);
+            HideoutSpot[] spots = BuildRestAndSpots(hideout);
 
             // 3) 구역: 다락방 하나 = 아이소메트릭 카메라 하나
             Transform zones = new GameObject("Room Cameras").transform;
@@ -264,6 +265,7 @@ public static class HideoutSceneBuilder
             var director = systems.AddComponent<HideoutDirector>();
             director.sampleCase = AssetDatabase.LoadAssetAtPath<CaseDeduction>(CaseDataPath);
             director.missionTable = builtTable;
+            systems.AddComponent<HideoutResidents>().spots = spots;
             builtTable.sites = sites;
             GuiltSystemValidator.EnsureTableAsset(); // 예시 기록의 종용 죄책감 행동이 행동 표에 있도록
 
@@ -337,6 +339,72 @@ public static class HideoutSceneBuilder
         Station<HideoutStash>(stashRoot, Vector3.left, distance: 2.6f, height: 2.2f, viewSize: 0.95f);
         Station<StatusDesk>(deskRoot, Vector3.back, distance: 2.6f, height: 1.8f, viewSize: 1.05f);
         builtTable = BuildMissionTable(hideout, caseData);
+    }
+
+    // ---------------- 휴식 · 쉬는 자리 · 남매 대화 ----------------
+
+    static TalkLine L(CharacterType who, string text) => new TalkLine { speaker = who, text = text };
+    static Talk T(params TalkLine[] lines) => new Talk { lines = lines };
+
+    // 매트리스 = 휴식. 쉬는 자리 = 조작하지 않는 캐릭터가 머무는 곳 + 남매 대화 (대사는 임시, 기획이 인스펙터에서 고침)
+    // 쉬는 자리의 대화 범위(반경 1m)가 매트리스 휴식 범위와 겹치지 않게 둠 (PlayerInteraction은 근처 대상을 하나만 기억)
+    static HideoutSpot[] BuildRestAndSpots(Transform hideout)
+    {
+        var rest = new GameObject("매트리스 (휴식)");
+        rest.transform.SetParent(hideout);
+        rest.transform.position = new Vector3(-3.7f, 0f, 0.6f);
+        var reach = rest.AddComponent<BoxCollider>();
+        reach.isTrigger = true;
+        reach.center = new Vector3(0f, 1f, 0f);
+        reach.size = new Vector3(2.6f, 2f, 3.1f);
+        var restSpot = rest.AddComponent<RestSpot>();
+        restSpot.displayName = "매트리스에서";
+        restSpot.noiseRadius = 0f;
+
+        const CharacterType S = CharacterType.Player1, B_ = CharacterType.Player2;
+        var spots = new List<HideoutSpot>
+        {
+            // 여동생: 통찰·추리
+            Spot(hideout, S, "칠판 앞에서 사건을 본다", new Vector3(-1.1f, 0f, 2.15f), 0f,
+                new[] { T(L(S, "...아빠가 왜 이 사람들을 골랐는지, 아직 모르겠어."), L(B_, "너무 붙잡고 있지 마. 눈 빠지겠다.")),
+                        T(L(S, "칠판에 붙일 게 늘어날수록, 아빠가 낯설어져."), L(B_, "...그래도 우리 아빠야.")) },
+                new[] { T(L(S, "302호. 찻잔이 두 개였어. 아빠는 그 사람이랑 차를 마셨던 거야."), L(B_, "아는 사이였다는 거지."), L(S, "응. 그래서 더 무서워.")) }),
+            Spot(hideout, S, "지도 테이블 옆에서 고민한다", new Vector3(0.6f, 0f, 0.65f), 180f,
+                new[] { T(L(S, "다음엔 어디로 갈지... 오빠 생각은 어때?"), L(B_, "네가 정해. 난 문 따는 거나 할게.")),
+                        T(L(S, "지도로 보니까 이 도시, 생각보다 좁네."), L(B_, "그러니까 아빠도 멀리 못 갔을 거야.")) },
+                new[] { T(L(S, "수첩에 적힌 대로라면, 다음은 박 선생 댁이야."), L(B_, "목요일 밤 9시. 시간이 없네.")) }),
+            // 오빠: 몸·기계
+            Spot(hideout, B_, "작업대 의자에 앉아 기계를 만진다", new Vector3(3.2f, 0f, 2.2f), 0f,
+                new[] { T(L(B_, "이 녹음기, 조금만 손보면 쓸 만하겠는데."), L(S, "그걸로 뭐 하게?"), L(B_, "언젠간 쓸 데가 있겠지.")),
+                        T(L(B_, "공구가 하나 빠졌어. 너 혹시 만졌냐?"), L(S, "아니. 오빠가 어제 상자에 넣었잖아.")) },
+                new[] { T(L(B_, "302호 인터폰, 전선만 끊겨 있었어. 아빠가 끊은 거겠지."), L(S, "아빠는 기계를 잘 몰랐는데..."), L(B_, "...그러게.")) }),
+            Spot(hideout, B_, "상자 옆 벽에 기대 쉰다", new Vector3(4.55f, 0f, -1.4f), 270f,
+                new[] { T(L(B_, "잠깐만 이러고 있을게. 다리가 좀 쑤셔.")),
+                        T(L(B_, "여기 다락방, 어릴 때 숨바꼭질하던 데잖아."), L(S, "...그땐 아빠가 술래였지.")) },
+                new[] { T(L(B_, "그 집 책장, 생각보다 무거웠어."), L(S, "덕분에 수첩을 찾았잖아.")) }),
+            Spot(hideout, B_, "해치 옆에서 망을 본다", new Vector3(-0.6f, 0f, -2.6f), 0f,
+                new[] { T(L(B_, "아래층에서 소리 나면 바로 말해."), L(S, "오빠가 망보고 있잖아.")) },
+                new[] { T(L(B_, "경찰이 우리 얼굴을 봤으면 어쩌지."), L(S, "아직은 괜찮아. 아직은.")) }),
+        };
+        return spots.ToArray();
+    }
+
+    static HideoutSpot Spot(Transform parent, CharacterType owner, string label, Vector3 position, float facing, Talk[] talks, Talk[] afterCase)
+    {
+        var go = new GameObject($"쉬는 자리: {CharacterRoster.NameOf(owner)} — {label}");
+        go.transform.SetParent(parent);
+        go.transform.SetPositionAndRotation(position, Quaternion.Euler(0f, facing, 0f));
+        var reach = go.AddComponent<SphereCollider>();
+        reach.isTrigger = true;
+        reach.center = new Vector3(0f, 1f, 0f);
+        reach.radius = 1f;
+        var spot = go.AddComponent<HideoutSpot>();
+        spot.owner = owner;
+        spot.label = label;
+        spot.talks = talks;
+        spot.talksAfterCase = afterCase;
+        spot.noiseRadius = 0f;
+        return spot;
     }
 
     // ---------------- 지도 테이블 (임무 고르기) ----------------
@@ -508,7 +576,13 @@ public static class HideoutSceneBuilder
         B.Visual(eastRoof, "지붕", new Vector3(1.1f, 0f, 0f), new Vector3(2.2f, 0.08f, MaxZ - MinZ + 0.2f), roofMat);
         B.Visual(eastRoof, "둥근 창", new Vector3(1.2f, 0.05f, 1.2f), new Vector3(0.7f, 0.02f, 0.7f), lampMat);
 
-        // 램프 (소파 옆)
+        // 작업대 의자 (오빠의 쉬는 자리, 표시만 — 굽고 난 뒤라 길을 막지 않음)
+        B.Visual(decor, "의자 앉는 곳", new Vector3(3.2f, 0.45f, 2.15f), new Vector3(0.5f, 0.06f, 0.45f), beamMat);
+        B.Visual(decor, "의자 등받이", new Vector3(3.2f, 0.75f, 1.92f), new Vector3(0.5f, 0.55f, 0.06f), beamMat);
+        foreach ((float dx, float dz) in new[] { (-0.2f, -0.18f), (0.2f, -0.18f), (-0.2f, 0.18f), (0.2f, 0.18f) })
+            B.Visual(decor, "의자 다리", new Vector3(3.2f + dx, 0.21f, 2.15f + dz), new Vector3(0.05f, 0.42f, 0.05f), beamMat);
+
+        // 램프 (지도 테이블 옆)
         B.Visual(decor, "램프 기둥", new Vector3(2.0f, 0.6f, -1.2f), new Vector3(0.06f, 1.2f, 0.06f), metalMat);
         B.Visual(decor, "램프 갓", new Vector3(2.0f, 1.25f, -1.2f), new Vector3(0.4f, 0.25f, 0.4f), lampMat);
         var lamp = new GameObject("램프 빛").AddComponent<Light>();

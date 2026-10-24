@@ -94,6 +94,20 @@ public static class HideoutSceneValidator
             for (int j = i + 1; j < stations.Length; j++)
                 if (Vector3.Distance(Flat(stations[i].transform.position), Flat(stations[j].transform.position)) < 2.5f)
                     problems.Add($"{stations[i].name}·{stations[j].name} 조사 지점이 너무 가까움");
+        // 휴식·쉬는 자리: 매트리스 휴식 1, 여동생 자리 2 · 오빠 자리 3, 걸어서 닿고, 대화 범위가 매트리스 휴식 범위와 안 겹침
+        var restSpot = Object.FindAnyObjectByType<RestSpot>();
+        var residents = Object.FindAnyObjectByType<HideoutResidents>();
+        if (restSpot == null) problems.Add("매트리스 휴식(RestSpot) 없음");
+        if (residents == null || residents.spots.Length != 5 || residents.spots.Count(s => s != null && s.owner == CharacterType.Player1) != 2 || residents.spots.Count(s => s != null && s.owner == CharacterType.Player2) != 3)
+            problems.Add("쉬는 자리가 여동생 2 · 오빠 3이 아님");
+        else
+            foreach (HideoutSpot spot in residents.spots)
+            {
+                if (spot.talks.Length == 0 || spot.talks.Any(t => t.lines.Length == 0)) problems.Add($"{spot.name}: 평소 대화 없음");
+                if (!NavMesh.SamplePosition(spot.transform.position, out NavMeshHit hit, 0.6f, NavMesh.AllAreas) || !Reachable(start, spot.transform.position)) problems.Add($"{spot.name}: 걸어서 닿지 않음");
+                if (restSpot != null && spot.GetComponent<Collider>().bounds.Intersects(restSpot.GetComponent<Collider>().bounds)) problems.Add($"{spot.name}: 대화 범위가 매트리스 휴식 범위와 겹침");
+            }
+
         var chalkboard = Object.FindAnyObjectByType<Chalkboard>();
         if (chalkboard != null && (chalkboard.knownCases.Length == 0 || chalkboard.knownCases.Any(c => c == null))) problems.Add("칠판에 사건 데이터(302호)가 연결 안 됨");
         if (chalkboard != null && (chalkboard.photoSurface == null || chalkboard.photoMaterial == null || chalkboard.outlineMaterial == null)) problems.Add("칠판 사진 면·재질이 연결 안 됨");
@@ -344,6 +358,69 @@ public static class HideoutSceneValidator
         Check(!GameSession.Deployed && CameraTrigger.FindAt(sister.transform.position)?.buildingId == "Hideout" && CameraTrigger.FindAt(brother.transform.position)?.buildingId == "Hideout",
             "둘 다 다락방으로 돌아옴");
         Check(GameSession.AssignmentOf(CharacterType.Player1) == null && GameSession.AssignmentOf(CharacterType.Player2) == null, "귀환하면 배정은 비워짐");
+
+        // ---- 휴식 규칙: 돌아오면 휴식해야 출발 ----
+        Check(GameSession.NeedsRest, "임무에서 돌아오면 '휴식 필요'");
+        GameSession.Assign(CharacterType.Player1, "park_teacher");
+        GameSession.Assign(CharacterType.Player2, "park_teacher");
+        Check(table.AllAssigned && !table.CanDepart && !table.Depart() && table.Message.Contains("쉬자"), "휴식 전에는 배정이 끝나도 출발 못 함 ('먼저 좀 쉬자')");
+
+        // ---- 쉬는 자리: 조작하지 않는 캐릭터는 자기 자리에 ----
+        var residents = Object.FindAnyObjectByType<HideoutResidents>();
+        GameObject active = manager.GetActivePlayer(), idle = active == sister ? brother : sister;
+        CharacterType idleType = CharacterRoster.TypeOf(idle), activeType = CharacterRoster.TypeOf(active);
+        HideoutSpot idleSpot = residents.SpotOf(idleType);
+        Check(idleSpot != null && idleSpot.owner == idleType && idleSpot.Occupied && Vector3.Distance(Flat(idle.transform.position), Flat(idleSpot.transform.position)) < 0.6f,
+            $"돌아온 뒤 {CharacterRoster.NameOf(idleType)}은(는) 자기 쉬는 자리에 ({idleSpot?.label})");
+        Check(residents.spots.Count(s => s.Occupied) == 1, "자리에 있는 건 조작하지 않는 캐릭터 한 명뿐");
+
+        // ---- 남매 대화: E → 대사 패널에 한 줄씩, 대화 중 잠김 ----
+        Talk expected = idleSpot.NextTalk;
+        Check(expected != null && idleSpot.talksAfterCase.Contains(expected), "사건 기록이 있으면 '사건 뒤' 대화를 먼저");
+        PlayerInteraction hands = active.GetComponent<PlayerInteraction>();
+        idleSpot.Use(hands);
+        yield return 0.4f;
+        DialogueManager dialogue = DialogueManager.instance;
+        Check(HideoutTalk.Playing && dialogue.InConversation && hands.Locks.IsLocked && manager.SwitchLocks.IsLocked && idle.GetComponent<PlayerMovement>().Locks.IsLocked,
+            "남매 대화 중 두 사람 모두 이동·입력·전환 잠김");
+        Check(dialogue.CurrentSpeaker == CharacterRoster.NameOf(expected.lines[0].speaker), $"첫 줄 말하는 사람 = {dialogue.CurrentSpeaker}");
+        for (int i = 0; i < expected.lines.Length * 2 + 2 && dialogue.InConversation; i++)
+        {
+            dialogue.scriptedAdvance = true;   // E/Space 대신
+            yield return 0.15f;
+        }
+        yield return 0.4f;
+        Check(!HideoutTalk.Playing && !dialogue.InConversation && !hands.Locks.IsLocked && !manager.SwitchLocks.IsLocked, "대화가 끝나면 잠금이 풀림");
+
+        // ---- 휴식: 매트리스 E → 확인 → 아니오/예 ----
+        var restSpot = Object.FindAnyObjectByType<RestSpot>();
+        restSpot.Use(hands);
+        yield return 0.3f;
+        Check(restSpot.Confirming && hands.Locks.IsLocked, "매트리스 E → '휴식할까?' 확인 (이동 잠김)");
+        restSpot.Confirm(false);
+        yield return 0.2f;
+        Check(!restSpot.Confirming && !hands.Locks.IsLocked && GameSession.NeedsRest, "Q → 취소, 여전히 휴식 필요");
+        restSpot.Use(hands);
+        yield return 0.3f;
+        restSpot.Confirm(true);
+        yield return 2.0f;
+        Check(!GameSession.NeedsRest && dialogue.InConversation, "휴식 → 페이드 뒤 기본 독백, 다시 출발할 수 있음");
+        Check(dialogue.CurrentSpeaker == CharacterRoster.NameOf(activeType) && dialogue.CurrentLine.Contains("눈을 붙였다"), "독백은 조작 중인 캐릭터가 (임무 뒤 휴식 문장)");
+        for (int i = 0; i < 4 && dialogue.InConversation; i++) { dialogue.scriptedAdvance = true; yield return 0.15f; }
+        yield return 0.4f;
+        Check(!dialogue.InConversation && !hands.Locks.IsLocked && table.CanDepart, "독백이 끝나면 조작 가능, 배정돼 있으면 출발 가능");
+        GameSession.ClearAssignments();
+        HideoutSpot afterRest = residents.SpotOf(idleType);
+        Check(afterRest.Occupied && Vector3.Distance(Flat(idle.transform.position), Flat(afterRest.transform.position)) < 0.6f, $"휴식 뒤 새 자리로 ({afterRest.label})");
+
+        // ---- 전환: 조작하던 캐릭터는 자기 자리로, 바뀐 캐릭터는 그 자리에서 움직임 ----
+        Vector3 idleWas = idle.transform.position;
+        manager.SwitchInstant(System.Array.IndexOf(manager.players, idle));
+        yield return 0.3f;
+        HideoutSpot activeSpot = residents.SpotOf(activeType);
+        Check(manager.GetActivePlayer() == idle && Vector3.Distance(idle.transform.position, idleWas) < 0.3f, "전환한 캐릭터는 제자리에서 조작 시작");
+        Check(activeSpot.Occupied && !afterRest.Occupied && Vector3.Distance(Flat(active.transform.position), Flat(activeSpot.transform.position)) < 0.6f,
+            $"조작하던 {CharacterRoster.NameOf(activeType)}은(는) 자기 자리로 ({activeSpot.label})");
     }
 
     static Vector3 Flat(Vector3 v) => new Vector3(v.x, 0f, v.z);
@@ -417,6 +494,27 @@ public static class HideoutSceneValidator
         ScreenCapture.CaptureScreenshot(System.IO.Path.Combine(captureFolder, "window_MissionTable_mission.png"));
         Debug.Log("[아지트 창 캡처] 지도 테이블");
         yield return 1.0f;
+        table.Close();
+        yield return 2.0f;
+
+        // 쉬는 자리의 형제와 대화 (대사 패널) · 매트리스 휴식 확인
+        GameObject idle = CharacterManager.instance.players[1];
+        HideoutSpot spot = Object.FindAnyObjectByType<HideoutResidents>().SpotOf(CharacterRoster.TypeOf(idle));
+        PlayerInteraction hands = CharacterManager.instance.players[0].GetComponent<PlayerInteraction>();
+        spot.Use(hands);
+        yield return 2.5f;
+        ScreenCapture.CaptureScreenshot(System.IO.Path.Combine(captureFolder, "window_SiblingTalk.png"));
+        yield return 0.5f;
+        for (int i = 0; i < 8 && DialogueManager.instance.InConversation; i++) { DialogueManager.instance.scriptedAdvance = true; yield return 0.2f; }
+        yield return 0.5f;
+        var rest = Object.FindAnyObjectByType<RestSpot>();
+        rest.Use(hands);
+        yield return 0.5f;
+        ScreenCapture.CaptureScreenshot(System.IO.Path.Combine(captureFolder, "window_Rest.png"));
+        Debug.Log("[아지트 창 캡처] 대화·휴식");
+        yield return 0.5f;
+        rest.Confirm(false);
+        yield return 0.3f;
     }
 
     // 가구 둘레(가운데에서 1.4m, 바닥 높이) 중 한 곳까지 걸어갈 수 있는가

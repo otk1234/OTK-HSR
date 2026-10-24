@@ -137,14 +137,20 @@ public class MissionTable : HideoutStation
         return true;
     }
 
-    public bool CanDepart => Siblings.All(who => SiteFor(GameSession.AssignmentOf(who)) != null);
+    public bool AllAssigned => Siblings.All(who => SiteFor(GameSession.AssignmentOf(who)) != null);
+    public bool CanDepart => AllAssigned && !GameSession.NeedsRest;
 
     // ---------------- 출발 · 귀환 ----------------
 
     public bool Depart()
     {
         if (Busy) return false;
-        if (!CanDepart)
+        if (GameSession.NeedsRest)
+        {
+            Message = "임무에서 막 돌아왔다. 먼저 좀 쉬자. (매트리스)";
+            return false;
+        }
+        if (!AllAssigned)
         {
             Message = "남매 둘 다 갈 곳을 정해야 출발할 수 있다.";
             return false;
@@ -186,18 +192,26 @@ public class MissionTable : HideoutStation
             }
             Warp(player, to);
         }
-        // 화면이 밝아지기 전에 구역 카메라를 새 장소로 (조작 중인 캐릭터 기준)
-        yield return new WaitForFixedUpdate();
-        yield return null;   // 구역 트리거(OnTriggerEnter)가 처리된 뒤
-        foreach (CameraTrigger room in CameraTrigger.All) room.UpdateCameraStateInstant();
         GameSession.Deployed = depart;
         if (depart)
             Debug.Log("[임무] 출발 — " + string.Join(", ", Siblings.Select(w => $"{CharacterRoster.NameOf(w)} → {PlaceName(GameSession.AssignmentOf(w))}")));
         else
         {
-            Debug.Log("[임무] 아지트로 귀환");
+            Debug.Log("[임무] 아지트로 귀환 — 휴식해야 다시 출발할 수 있음");
             GameSession.ClearAssignments();
+            GameSession.NeedsRest = true;
         }
+        // 아지트에 있는 동안만 쉬는 자리를 씀: 출발하면 비우고, 돌아오면 새 자리로 (조작하지 않는 캐릭터)
+        if (HideoutResidents.instance != null)
+        {
+            if (!depart) HideoutResidents.instance.Shuffle();
+            HideoutResidents.instance.PlaceIdle();
+        }
+
+        // 화면이 밝아지기 전에 구역 카메라를 새 장소로 (조작 중인 캐릭터 기준)
+        yield return new WaitForFixedUpdate();
+        yield return null;   // 구역 트리거(OnTriggerEnter)가 처리된 뒤
+        foreach (CameraTrigger room in CameraTrigger.All) room.UpdateCameraStateInstant();
 
         if (fade != null) { yield return fade.FadeIn(); fade.isFading = false; }
         GameMessage.Show(depart ? "출발했다." : "[개발용] 아지트로 돌아왔다.");
@@ -331,7 +345,9 @@ public class MissionTable : HideoutStation
         Fill(bar, CenteredBackground);
         blocked.Add(bar);
         string plan = string.Join("   ", Siblings.Select(w => $"{CharacterRoster.NameOf(w)} → {PlaceName(GameSession.AssignmentOf(w))}"));
-        string line = Message.Length > 0 ? $"<color=#ffd27f>{Message}</color>" : "<color=#bbbbbb>빨간 핀을 눌러 갈 사람을 정한다</color>";
+        string line = Message.Length > 0 ? $"<color=#ffd27f>{Message}</color>"
+            : GameSession.NeedsRest ? "<color=#ffd27f>임무에서 막 돌아왔다. 먼저 좀 쉬자. (매트리스)</color>"
+            : "<color=#bbbbbb>빨간 핀을 눌러 갈 사람을 정한다</color>";
         GUI.Label(new Rect(bar.x, bar.y, bar.width - 230f, bar.height), $"<b>[개발용] 배정</b>  {plan}\n{line}", style);
 
         GUI.enabled = CanDepart && !Busy;
