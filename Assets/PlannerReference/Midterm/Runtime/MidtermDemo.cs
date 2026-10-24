@@ -36,6 +36,7 @@ namespace OTK.Midterm
         private static int active;
         private static bool introductionSeen;
         private static string arrival;
+        private static HashSet<string> collectedItems;
         private CharacterController[] controllers;
         private MidtermDummyVisual[] visuals;
         private List<Vector3> trail = new List<Vector3>();
@@ -47,6 +48,7 @@ namespace OTK.Midterm
         private string[] dialogue;
         private int line;
         private MidtermInspectable pending, hover;
+        private MidtermPickup nearbyPickup, pickupPrompt;
         private GUIStyle label;
         private Vector2 informationScroll;
         private AudioSource dogAudio;
@@ -59,12 +61,13 @@ namespace OTK.Midterm
             "여동생 : 그걸 지금 왜 써!", "오빠 : 아무튼!", "여동생 : 일단 상태를 좀 보자."
         };
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        private static void ResetSession() { states = null; active = 0; introductionSeen = false; arrival = null; }
+        private static void ResetSession() { states = null; active = 0; introductionSeen = false; arrival = null; collectedItems = null; }
         public bool CanSwitch => actors[0].gameObject.activeInHierarchy && actors[1].gameObject.activeInHierarchy && actors[0].gameObject.scene == actors[1].gameObject.scene && states[0].map == states[1].map;
         public bool IsInspecting => inspecting;
         public bool Knows(int actor, string id) => states[actor].knowledge.Contains(id);
         public int UsedSlots(int actor) => states[actor].items.Sum(i => i.slots);
         public int Capacity(int actor) => actor == 0 ? 5 : 6;
+        public bool HasItem(int actor, string id) => states[actor].items.Exists(i => i.id == id);
         public bool TryAddItem(int actor, Item item)
         {
             if (item == null || item.slots < 1 || UsedSlots(actor) + item.slots > Capacity(actor)) return false;
@@ -87,6 +90,7 @@ namespace OTK.Midterm
         private void Awake()
         {
             if (states == null) states = new[] { new ActorState(), new ActorState() };
+            if (collectedItems == null) collectedItems = new HashSet<string>();
             string scene = gameObject.scene.name;
             foreach (var s in states) s.map = scene;
             controllers = new CharacterController[2];
@@ -119,6 +123,8 @@ namespace OTK.Midterm
                 dogAudio.rolloffMode=AudioRolloffMode.Linear; dogAudio.volume=.6f;
             }
             trail.Add(actors[active].position);
+            foreach (var pickup in FindObjectsByType<MidtermPickup>(FindObjectsSortMode.None))
+                if (collectedItems.Contains(pickup.itemId)) pickup.gameObject.SetActive(false);
         }
         private void Update()
         {
@@ -128,6 +134,13 @@ namespace OTK.Midterm
             {
                 foreach (var v in visuals) v.SetMovementInput(Vector2.zero);
                 if (Input.GetKeyDown(KeyCode.E) || Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.Return)) NextLine();
+                return;
+            }
+            if (pickupPrompt != null)
+            {
+                foreach (var v in visuals) v.SetMovementInput(Vector2.zero);
+                if (Input.GetKeyDown(KeyCode.Q) || Input.GetKeyDown(KeyCode.Escape)) { pickupPrompt=null; return; }
+                if (Input.GetKeyDown(KeyCode.E)) ConfirmPickup();
                 return;
             }
             if (Input.GetKeyDown(KeyCode.I)) { panel=!panel; if(panel) unread=false; }
@@ -147,6 +160,8 @@ namespace OTK.Midterm
                 if (hover != null && Input.GetMouseButtonDown(0) && Input.mousePosition.y>145 && Input.mousePosition.x<Screen.width-65) BeginInspection(hover);
                 return;
             }
+            nearbyPickup=FindNearbyPickup();
+            if(nearbyPickup!=null && Input.GetKeyDown(KeyCode.E)) {pickupPrompt=nearbyPickup;return;}
             if(Input.GetKeyDown(KeyCode.Tab)) SwitchActor();
             if(Input.GetKeyDown(KeyCode.R))
             {
@@ -198,6 +213,29 @@ namespace OTK.Midterm
             cam.orthographicSize=Mathf.Lerp(cam.orthographicSize,inspecting?2.65f:5.6f,t);
         }
         private void Travel(string scene,string side) { arrival=side; SceneManager.LoadScene(scene); }
+        private MidtermPickup FindNearbyPickup()
+        {
+            MidtermPickup nearest=null;float distance=float.MaxValue;
+            foreach(var candidate in FindObjectsByType<MidtermPickup>(FindObjectsSortMode.None))
+            {
+                if(!candidate.gameObject.activeInHierarchy)continue;
+                float d=Vector3.Distance(actors[active].position,candidate.transform.position);
+                if(d<=candidate.interactionDistance && d<distance){nearest=candidate;distance=d;}
+            }
+            return nearest;
+        }
+        private void ConfirmPickup()
+        {
+            if(pickupPrompt==null)return;
+            var item=new Item{id=pickupPrompt.itemId,name=pickupPrompt.itemName,slots=pickupPrompt.slots,capturesEvidence=pickupPrompt.capturesEvidence};
+            if(!TryAddItem(active,item))
+            {
+                notice="소지품 칸이 부족하다.";noticeUntil=Time.time+2.5f;return;
+            }
+            collectedItems.Add(pickupPrompt.itemId);
+            notice=pickupPrompt.itemName+"을(를) 주웠다.";noticeUntil=Time.time+2.5f;
+            pickupPrompt.gameObject.SetActive(false);pickupPrompt=null;nearbyPickup=null;
+        }
         private void SetHover(MidtermInspectable value) { if(hover==value)return; if(hover!=null)hover.Highlight(false); hover=value; if(hover!=null)hover.Highlight(true); }
         private void BeginInspection(MidtermInspectable target) { pending=target; dialogue=target.lines; line=0; SetHover(null); }
         private void NextLine()
@@ -256,6 +294,7 @@ namespace OTK.Midterm
             if(Button(new Rect(1212,295,50,64),panel?">":"<")) {panel=!panel;if(panel)unread=false;}
             if(unread) {Fill(new Rect(1246,287,12,20),Color.red);Fill(new Rect(1242,291,20,12),Color.red);}
             Text(new Rect(490,665,480,45),inspecting?"마우스 조사 · E / Q 돌아가기":"WASD 이동 · Tab 전환 · E 조사 · I 정보",14);
+            if(dialogue==null && pickupPrompt==null && !inspecting && nearbyPickup!=null)Text(new Rect(490,550,340,30),"[E] "+nearbyPickup.itemName+" 확인",22);
             if(dialogue==null && !inspecting && isAlley && Vector3.Distance(actors[active].position,investigation.position)<4.5f)Text(new Rect(490,550,340,30),"[E] 현장 조사",22);
             if(dialogue==null && location=="마을" && Mathf.Abs(actors[active].position.x-10)<3 && actors[active].position.z>6)Text(new Rect(490,550,340,30),"↑ 골목",22);
             if(hover!=null)Text(new Rect(490,510,320,35),hover.title,22);
@@ -269,6 +308,13 @@ namespace OTK.Midterm
                 if(!string.IsNullOrEmpty(speaker)) {Box(new Rect(88,384,220,55));Text(new Rect(105,394,186,38),speaker,27);}
                 Text(new Rect(100,465,1080,157),body,28);
                 if(Button(new Rect(1005,642,175,43),"E · 다음"))NextLine();
+            }
+            if(pickupPrompt!=null)
+            {
+                Box(new Rect(210,205,860,310));
+                Text(new Rect(250,240,780,45),pickupPrompt.itemName,30);
+                Text(new Rect(250,310,780,100),pickupPrompt.description,23);
+                Text(new Rect(250,445,780,42),"E · 습득     Q · 돌아가기",19);
             }
             if(Time.time<noticeUntil)Text(new Rect(400,100,480,40),notice);
             GUI.matrix=Matrix4x4.identity;

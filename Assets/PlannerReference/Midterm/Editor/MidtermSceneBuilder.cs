@@ -128,6 +128,11 @@ public static class MidtermSceneBuilder
                 if(i%2==0)Shape("남쪽 상점",new Vector3(x,1.4f,-11),new Vector3(6,2.8f,5),gray);
             }
             Label("ALLEY  ^",new Vector3(10,.15f,7));
+            var notebook=Shape("떨어진 공책",new Vector3(9.3f,.08f,11),new Vector3(.58f,.12f,.78f),brown);
+            notebook.transform.rotation=Quaternion.Euler(0,18,0);
+            var pickup=notebook.AddComponent<MidtermPickup>();
+            pickup.itemId="town.notebook";pickup.itemName="공책";pickup.slots=1;
+            pickup.description="표지가 낡은 작은 공책이다. 여러 장이 뜯겨 나갔고, 남은 페이지에는 알아보기 어려운 글씨가 적혀 있다.";
             var sound=new GameObject("골목에서 들리는 개 소리");sound.transform.position=new Vector3(10,1,19);demo.dog=sound.transform;
         }
         if(kind=="Alley")
@@ -200,7 +205,12 @@ public static class MidtermSceneBuilder
             if(demo.catalog.Length!=7)throw new Exception("Expected seven clue records");
             if(kind!="Beyond"&&demo.bark==null)throw new Exception("Bark missing");
             Physics.SyncTransforms();
-            if(kind=="Town")CheckPassage(new Vector3(10,1,1),new Vector3(10,1,19));
+            if(kind=="Town")
+            {
+                CheckPassage(new Vector3(10,1,1),new Vector3(10,1,19));
+                var notebook=GameObject.Find("떨어진 공책");
+                if(notebook==null || notebook.GetComponent<MidtermPickup>()==null)throw new Exception("Notebook pickup missing");
+            }
             if(kind=="Alley")
             {
                 CheckPassage(new Vector3(-10,1,-14),new Vector3(-10,1,3));
