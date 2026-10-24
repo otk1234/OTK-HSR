@@ -6,6 +6,15 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
+    path: Assets/PlannerReference/Midterm/Scenes/Midterm_Town.unity
+    guid: d16c0d8bae0283045a7504e24e47d4a8
+  - enabled: 1
+    path: Assets/PlannerReference/Midterm/Scenes/Midterm_Alley.unity
+    guid: af7baa71645ec7a47bcd6a342ca32847
+  - enabled: 1
+    path: Assets/PlannerReference/Midterm/Scenes/Midterm_Beyond.unity
+    guid: 042b91fd4896bf840b0783234da36ff1
+  - enabled: 1
     path: Assets/PlannerReference/Scenes/Prototype_PlannerReference.unity
     guid: b8c977445a2166d49a64151670332065
   - enabled: 1

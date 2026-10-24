@@ -6,7 +6,7 @@ using UnityEditor.SceneManagement;
 [InitializeOnLoad]
 public static class PlannerReferenceDefaultScene
 {
-    private const string ScenePath = "Assets/PlannerReference/Scenes/Prototype_PlannerReference.unity";
+    private const string ScenePath = "Assets/PlannerReference/Midterm/Scenes/Midterm_Town.unity";
     private const string SessionKey = "OTK.PlannerReference.DefaultSceneOpened";
 
     static PlannerReferenceDefaultScene()
