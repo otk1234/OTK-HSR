@@ -26,7 +26,7 @@ public class CrimeSceneDirector : MonoBehaviour
         PlayerInteractor3D inspector = ActiveInspector();
         if (inspector == null || inspector.Selected == null) return;
         if (!inspector.Selected.TryGetComponent(out Clue clue)) return;
-        CaseFile.Add(clue.clueId, clue.Title, inspector.GetComponent<PlayerInteraction>().myType);
+        CaseFile.Add(clue.clueId, clue.Title, inspector.GetComponent<PlayerInteraction>().myType, inspector.Selected.Description);
     }
 
     void OnGUI()

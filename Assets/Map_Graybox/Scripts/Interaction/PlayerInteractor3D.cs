@@ -20,8 +20,11 @@ namespace NarrativeGraybox.Interaction
         public bool IsBusy => IsInspecting || talkingTo != null || ExternalLock;
         public bool IsInspecting => area != null;
         public InspectionItem Selected => selected;
+        public InspectionArea CurrentArea => area; // [OTK 통합] 지금 조사 중인 지점 (아지트 칠판·상자·작업대가 읽음)
         // [OTK 통합] true를 돌려주면(근처에 아이템·문이 있음) 조사/대화 입력을 양보한다.
         public System.Func<bool> HasPriorityInteraction;
+        // [OTK 통합] true를 돌려주면(그 화면 위치에 다른 창·버튼이 있음, GUI 좌표) 조사 항목을 고르지 않는다.
+        public System.Func<Vector2,bool> BlocksPointer;
         // [OTK 통합] 이동을 NavMesh 시스템이 맡는 경우 playerController가 비어 있을 수 있다.
         private void SetPlayerMovement(bool enabled){if(playerController!=null)playerController.SetMovementEnabled(enabled);}
         public void Configure(IsometricCameraFollow cameraFollow, IsometricPlayerController movement, SimpleGameHud gameHud)
@@ -69,7 +72,8 @@ namespace NarrativeGraybox.Interaction
             if(Input.GetKeyDown(KeyCode.Q)||Input.GetKeyDown(KeyCode.Escape)){Back();return;}
             if(Input.GetKeyDown(KeyCode.E)&&selected!=null){CollectSelected();return;}
             InspectionItem hitItem=null;float nearestHit=float.PositiveInfinity;
-            if(!PanelRect().Contains(new Vector2(Input.mousePosition.x,Screen.height-Input.mousePosition.y)))
+            Vector2 pointer=new Vector2(Input.mousePosition.x,Screen.height-Input.mousePosition.y); // [OTK 통합]
+            if(!PanelRect().Contains(pointer)&&(BlocksPointer==null||!BlocksPointer(pointer))) // [OTK 통합]
             {
                 Ray ray=Camera.main.ScreenPointToRay(Input.mousePosition);
                 foreach(var hit in Physics.RaycastAll(ray,100,~0,QueryTriggerInteraction.Collide))

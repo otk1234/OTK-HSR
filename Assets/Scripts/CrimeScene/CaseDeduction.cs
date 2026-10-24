@@ -48,6 +48,27 @@ public class CaseDeduction : ScriptableObject
     public string caseTitle = "302호 살인 사건 (임시)";
     public Question[] questions;
 
+    // 아지트 칠판 사진에 붙는 기억 글 (기획이 씀). 비워 두면 기록에서 자동으로 만듦 (사건 요약 / 단서를 찾을 때 본 설명)
+    [Serializable]
+    public class ClueMemory
+    {
+        public string clueId;
+        [TextArea] public string text;
+    }
+
+    [Header("칠판: 피해자 사진의 기억 글 (비우면 자동)")]
+    [TextArea] public string boardMemory = "";
+    [Header("칠판: 단서 사진의 기억 글 (없는 단서는 자동)")]
+    public ClueMemory[] clueMemories = new ClueMemory[0];
+
+    public string MemoryOf(string clueId)
+    {
+        if (clueMemories != null)
+            foreach (ClueMemory m in clueMemories)
+                if (m != null && m.clueId == clueId && !string.IsNullOrEmpty(m.text)) return m.text;
+        return null;
+    }
+
     public Question Find(string questionId)
     {
         if (questions == null) return null;

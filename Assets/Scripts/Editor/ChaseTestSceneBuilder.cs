@@ -333,7 +333,7 @@ public static class ChaseTestSceneBuilder
         return box;
     }
 
-    internal static void BakeNavMesh(string assetName = "ChaseTest NavMesh")
+    internal static void BakeNavMesh(string assetName = "ChaseTest NavMesh", Bounds? area = null)
     {
         var surface = new GameObject("NavMesh").AddComponent<NavMeshSurface>();
         surface.collectObjects = CollectObjects.All;
@@ -342,7 +342,7 @@ public static class ChaseTestSceneBuilder
         NavMeshBuildSettings settings = NavMesh.GetSettingsByID(surface.agentTypeID);
         settings.agentRadius = 0.25f;
 
-        var bounds = new Bounds(new Vector3(0f, 1f, 0f), new Vector3(32f, 6f, 28f));
+        Bounds bounds = area ?? new Bounds(new Vector3(0f, 1f, 0f), new Vector3(32f, 6f, 28f));   // 아지트는 멀리 떨어진 임시 임무 장소까지
         var sources = new List<NavMeshBuildSource>();
         NavMeshBuilder.CollectSources(bounds, ~0, NavMeshCollectGeometry.RenderMeshes, 0, new List<NavMeshBuildMarkup>(), sources);
         NavMeshData data = NavMeshBuilder.BuildNavMeshData(settings, sources, bounds, Vector3.zero, Quaternion.identity);

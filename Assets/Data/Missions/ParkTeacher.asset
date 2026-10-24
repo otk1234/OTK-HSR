@@ -1,0 +1,20 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e3f5be421e48a6843af4fb4cf268946d, type: 3}
+  m_Name: ParkTeacher
+  m_EditorClassIdentifier: Assembly-CSharp::MissionDefinition
+  id: park_teacher
+  displayName: "\uBC15 \uC120\uC0DD \uB301"
+  kind: 1
+  caseId: 
+  description: "\uD53C\uD574\uC790 \uC218\uCCA9 \uB9C8\uC9C0\uB9C9 \uC7A5\uC5D0 \uC801\uD78C \uACF3. '\uBAA9\uC694\uC77C \uBC24 9\uC2DC, \uBC15 \uC120\uC0DD \uB301.'\n\uC544\uBE60\uAC00 \uC6D0\uB798 \uB178\uB9AC\uB358 \uB2E4\uC74C \uD45C\uC801\uC774\uB2E4. (\uC784\uC2DC)"
+  mapPosition: {x: 0.66, y: 0.1}

@@ -1,0 +1,20 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e3f5be421e48a6843af4fb4cf268946d, type: 3}
+  m_Name: Neighbor
+  m_EditorClassIdentifier: Assembly-CSharp::MissionDefinition
+  id: case302_neighbor
+  displayName: "302\uD638 \uC606\uC9D1"
+  kind: 1
+  caseId: 
+  description: "302\uD638 \uC606\uC9D1. '\uC606\uC9D1 \uC0AC\uB78C\uC774 \uADF8\uB0A0 \uBC24 \uB2E4 \uBD24\uB2E4'\uB294 \uBA54\uBAA8\uAC00 \uC544\uBE60 \uB208\uC5D0 \uB4E4\uC5B4\uAC14\uB2E4\uBA74,\n\uC544\uBE60\uB294 \uC774\uC81C \uC774 \uC0AC\uB78C\uC744 \uB178\uB9B0\uB2E4. (\uC784\uC2DC)"
+  mapPosition: {x: 0.28, y: 0.56}

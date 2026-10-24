@@ -19,6 +19,12 @@ public class DeductionBoard : MonoBehaviour
     private GameObject lockedPlayer;
     private GUIStyle style;
 
+    // 사건 파일을 이 사건 기준으로 (단서 기록·선택지 잠금 판정)
+    void Awake()
+    {
+        if (deduction != null) CaseFile.SetCurrentCase(deduction.caseId);
+    }
+
     void OnEnable()
     {
         if (timer != null) timer.TimeUp += OnTimeUp;
